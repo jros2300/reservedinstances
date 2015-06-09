@@ -68,7 +68,7 @@ module AwsCommon
   end
 
   def get_reserved_instances(regions, account_ids)
-    Rails.cache.fetch("reserved_instances", expires_in: 20.minutes) do
+    #Rails.cache.fetch("reserved_instances", expires_in: 20.minutes) do
       instances = {}
       current_account_id = get_current_account_id
 
@@ -114,7 +114,10 @@ module AwsCommon
         end
       end
 
+      ########## INJECT SOME TEST DATA
+      #instances['rid1'] = {type: 't2.small', az: 'eu-west-1a', tenancy: 'default', account_id: '1111111', count: 1, description: 'Linux', vpc: 'Classic', platform: 'Windows'} 
+      ########## INJECT SOME TEST DATA
       instances
-    end
+    #end
   end
 end
