@@ -1,0 +1,36 @@
+<h1>Summary</h1>
+
+<table class="table table-striped table-hover">
+    <thead>
+      <tr>
+        <th>Instance type</th>
+        <th>Availability Zone</th>
+        <th>Platform</th>
+        <th>Network</th>
+        <th>Tenancy</th>
+        <th>Total Instances</th>
+        <th>Total Reservations</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @summary.each do |type, elem1| %>
+        <% elem1.each do |az, elem2| %>
+          <% elem2.each do |platform, elem3| %>
+            <% elem3.each do |vpc, elem4| %>
+              <% elem4.each do |tenancy, total| %>
+                <tr>
+                  <td><%= type %></td>
+                  <td><%= az %></td>
+                  <td><%= platform %></td>
+                  <td><%= vpc %></td>
+                  <td><%= tenancy %></td>
+                  <td><%= total[0] %></td>
+                  <td><%= total[1] %></td>
+                </tr>
+              <% end %>
+            <% end %>
+          <% end %>
+        <% end %>
+      <% end %>
+    </tbody>
+  </table>

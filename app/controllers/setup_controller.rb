@@ -8,6 +8,7 @@ class SetupController < ApplicationController
 
   def change
     Setup.put_regions params[:regions]
+    Rails.cache.clear
     redirect_to action: 'index'
   end
 
