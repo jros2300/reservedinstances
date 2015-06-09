@@ -1,0 +1,16 @@
+<div>
+  <h1>Setup</h1>
+  <%= form_tag(change_setup_path) do %>
+    <div class="form-group">
+      <label>Regions in use</label></br>
+      <% @regions.keys.each do |region| %>
+        <label class="checkbox-inline">
+          <%= check_box_tag "regions[#{region}]", region, @regions[region] %>
+          <%= region %>
+        </label>
+      <% end %>
+    </div>
+    <%= submit_tag("Save", class: 'btn btn-default') %>
+  <% end %>
+
+</div>

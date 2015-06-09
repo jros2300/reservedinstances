@@ -1,0 +1,27 @@
+<h1>Instances</h1>
+<table class="table table-striped table-hover">
+  <thead>
+    <tr>
+      <th>Account ID</th>
+      <th>Instance ID</th>
+      <th>Instance type</th>
+      <th>Availability Zone</th>
+      <th>Tenancy</th>
+      <th>Platform</th>
+      <th>Network</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @instances.each do |instance_id, instance| %>
+      <tr>
+        <td><%= instance[:account_id] %></td>
+        <td><%= instance_id %></td>
+        <td><%= instance[:type] %></td>
+        <td><%= instance[:az] %></td>
+        <td><%= instance[:tenancy] %></td>
+        <td><%= instance[:platform].blank?  ? "linux" : instance[:platform] %></td>
+        <td><%= instance[:vpc].blank?  ? "EC2 Classic" : "VPC" %></td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>
