@@ -11,6 +11,8 @@ Rails.application.routes.draw do
   
   get '/instances' => 'instances#index'
   get '/reservedinstances' => 'reserved_instances#index'
+  get '/summary' => 'summary#index'
+  get '/recommendations' => 'summary#recommendations'
 
   # Example of regular route:
   #   get 'products/:id' => 'catalog#view'

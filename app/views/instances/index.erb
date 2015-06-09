@@ -19,8 +19,8 @@
         <td><%= instance[:type] %></td>
         <td><%= instance[:az] %></td>
         <td><%= instance[:tenancy] %></td>
-        <td><%= instance[:platform].blank?  ? "linux" : instance[:platform] %></td>
-        <td><%= instance[:vpc].blank?  ? "EC2 Classic" : "VPC" %></td>
+        <td><%= instance[:platform] %></td>
+        <td><%= instance[:vpc] %></td>
       </tr>
     <% end %>
   </tbody>
