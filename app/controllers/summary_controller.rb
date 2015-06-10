@@ -12,25 +12,36 @@ class SummaryController < ApplicationController
     summary = get_summary(instances,reserved_instances)
 
     continue_iteration = true
+    @recommendations = []
     while continue_iteration do
       excess = {}
       # Excess of Instances and Reserved Instances per set of interchangable types
       calculate_excess(summary, excess)
-      continue_iteration = iterate_recommendation(excess, instances, summary, reserved_instances)
+      continue_iteration = iterate_recommendation(excess, instances, summary, reserved_instances, @recommendations)
     end
+  end
 
+  def apply_recommendations
+    #Rails.logger.debug(params)
+    recommendations = JSON.parse params[:recommendations_original]
+    reserved_instances = get_reserved_instances(Setup.get_regions, get_account_ids)
+    selected = params[:recommendations].split(",")
+    selected.each do |index|
+      ri = reserved_instances[recommendations[index.to_i]["rid"]]
+      apply_recommendation(ri, recommendations[index.to_i])
+    end
   end
 
   private
 
-  def iterate_recommendation(excess, instances, summary, reserved_instances)
+  def iterate_recommendation(excess, instances, summary, reserved_instances, recommendations)
     excess.each do |family, elem1|
       elem1.each do |region, elem2|
         elem2.each do |platform, elem3|
           elem3.each do |tenancy, total|
             if total[1] > 0 && total[0] > 0
               # There are reserved instances not used and instances on-demand
-              return true if calculate_recommendation(instances, family, region, platform, tenancy, summary, reserved_instances)
+              return true if calculate_recommendation(instances, family, region, platform, tenancy, summary, reserved_instances, recommendations)
             end
           end
         end
@@ -39,7 +50,7 @@ class SummaryController < ApplicationController
     return false
   end
 
-  def calculate_recommendation(instances, family, region, platform, tenancy, summary, reserved_instances)
+  def calculate_recommendation(instances, family, region, platform, tenancy, summary, reserved_instances, recommendations)
     excess_instance = []
 
     instances.each do |instance_id, instance|
@@ -62,16 +73,20 @@ class SummaryController < ApplicationController
           excess_instance.each do |instance_id|
             # Change with the same type
             if instances[instance_id][:type] == ri[:type] 
+              recommendation = {rid: ri_id, count: 1}
               if instances[instance_id][:az] != ri[:az]
-                Rails.logger.debug("Change in the RI #{ri_id}, to az #{instances[instance_id][:az]}")
+                recommendation[:az] = instances[instance_id][:az]
+                #Rails.logger.debug("Change in the RI #{ri_id}, to az #{instances[instance_id][:az]}")
               end
               if instances[instance_id][:vpc] != ri[:vpc]
-                Rails.logger.debug("Change in the RI #{ri_id}, to vpc #{instances[instance_id][:vpc]}")
+                recommendation[:vpc] = instances[instance_id][:vpc]
+                #Rails.logger.debug("Change in the RI #{ri_id}, to vpc #{instances[instance_id][:vpc]}")
               end
               summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][1] -= 1
               summary[ri[:type]][instances[instance_id][:az]][ri[:platform]][instances[instance_id][:vpc]][ri[:tenancy]][1] += 1
               reserved_instances[ri_id][:count] -= 1
               reserved_instances[ri_id] = nil if reserved_instances[ri_id][:count] == 0
+              recommendations << recommendation
               return true
             end
           end
@@ -90,26 +105,35 @@ class SummaryController < ApplicationController
             if instances[instance_id][:type] != ri[:type] 
               factor_instance = get_factor(instances[instance_id][:type])
               factor_ri = get_factor(ri[:type])
+              recommendation = {rid: ri_id}
+              recommendation[:type] = instances[instance_id][:type]
+              recommendation[:az] = instances[instance_id][:az] if instances[instance_id][:az] != ri[:az]
+              recommendation[:vpc] = instances[instance_id][:vpc] if instances[instance_id][:vpc] != ri[:vpc]
               if factor_ri > factor_instance
                 # Split the RI
+                recommendation[:count] = 1
                 new_instances = factor_ri / factor_instance
-                Rails.logger.debug("Change in the RI #{ri_id}, split in #{new_instances} to type #{instances[instance_id][:type]}")
+                #Rails.logger.debug("Change in the RI #{ri_id}, split in #{new_instances} to type #{instances[instance_id][:type]}")
 
                 summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][1] -= 1
                 summary[instances[instance_id][:type]][instances[instance_id][:az]][ri[:platform]][instances[instance_id][:vpc]][ri[:tenancy]][1] += new_instances
                 reserved_instances[ri_id][:count] -= 1
                 reserved_instances[ri_id] = nil if reserved_instances[ri_id][:count] == 0
+                recommendations << recommendation
+                return true
               else
                 ri_needed = factor_instance / factor_ri
                 if (summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][1]-ri_needed) >= summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][0]
                   # If after the RI modification I'm going to have enough RIs
-                  Rails.logger.debug("Change in the RI #{ri_id}, join in #{ri_needed} to type #{instances[instance_id][:type]}")
+                  #Rails.logger.debug("Change in the RI #{ri_id}, join in #{ri_needed} to type #{instances[instance_id][:type]}")
+                  recommendation[:count] = ri_needed
                   summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][1] -= ri_needed
                   summary[instances[instance_id][:type]][instances[instance_id][:az]][ri[:platform]][instances[instance_id][:vpc]][ri[:tenancy]][1] += 1
                   reserved_instances[ri_id][:count] -= ri_needed
                   reserved_instances[ri_id] = nil if reserved_instances[ri_id][:count] == 0
+                  recommendations << recommendation
+                  return true
                 end
-                
               end
             end
           end

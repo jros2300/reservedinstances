@@ -95,7 +95,7 @@ module AwsCommon
           reserved_instances.each do |reserved_instance|
             reserved_instance.reserved_instances.each do |ri|
               if ri.state == 'active'
-                instances[ri.reserved_instances_id] = {type: ri.instance_type, az: ri.availability_zone, tenancy: ri.instance_tenancy, account_id: account_id[0], count: ri.instance_count, description: ri.product_description} 
+                instances[ri.reserved_instances_id] = {type: ri.instance_type, az: ri.availability_zone, tenancy: ri.instance_tenancy, account_id: account_id[0], count: ri.instance_count, description: ri.product_description, role_arn: account_id[1]} 
                 if supported_platforms[account_id[0]] == 'Classic'
                   instances[ri.reserved_instances_id][:vpc] = ri.product_description.include?("Amazon VPC") ? 'VPC' : 'EC2 Classic'
                 else
@@ -115,9 +115,26 @@ module AwsCommon
       end
 
       ########## INJECT SOME TEST DATA
-      #instances['rid1'] = {type: 't2.small', az: 'eu-west-1a', tenancy: 'default', account_id: '1111111', count: 1, description: 'Linux', vpc: 'Classic', platform: 'Windows'} 
+      #instances['rid1'] = {type: 't2.small', az: 'eu-west-1a', tenancy: 'default', account_id: '1111111', count: 2, description: 'Linux', vpc: 'Classic', platform: 'Windows'} 
       ########## INJECT SOME TEST DATA
       instances
     #end
+  end
+
+  def apply_recommendation(ri, recommendation)
+    region = ri[:az][0..-2]
+    if ri[:account_id] == get_current_account_id
+      ec2 = Aws::EC2::Client.new(region: region)
+    else
+      role_credentials = Aws::AssumeRoleCredentials.new( client: Aws::STS::Client.new(region: region), role_arn: ri[:role_arn], role_session_name: "reserved_instances" )
+      ec2 = Aws::EC2::Client.new(region: region, credentials: role_credentials)
+    end
+    conf = {}
+    conf[:availability_zone] = recommendation["az"].nil? ? ri[:az] : recommendation["az"] 
+    conf[:platform] = recommendation["vpc"].nil? ? (ri[:vpc] == 'VPC' ? 'EC2-VPC' : 'EC2-Classic') : (recommendation["vpc"] == 'VPC' ? 'EC2-VPC' : 'EC2-Classic')
+    conf[:instance_count] = recommendation["count"] 
+    conf[:instance_type] = recommendation["type"].nil? ? ri[:type] : recommendation["type"] 
+    #Rails.logger.debug(conf)
+    ec2.modify_reserved_instances(reserved_instances_ids:[recommendation["rid"]], target_configurations: [conf])
   end
 end
