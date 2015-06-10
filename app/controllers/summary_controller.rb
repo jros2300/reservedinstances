@@ -111,8 +111,8 @@ class SummaryController < ApplicationController
               recommendation[:vpc] = instances[instance_id][:vpc] if instances[instance_id][:vpc] != ri[:vpc]
               if factor_ri > factor_instance
                 # Split the RI
-                recommendation[:count] = 1
                 new_instances = factor_ri / factor_instance
+                recommendation[:count] = new_instances.to_i
                 #Rails.logger.debug("Change in the RI #{ri_id}, split in #{new_instances} to type #{instances[instance_id][:type]}")
 
                 summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][1] -= 1
@@ -126,7 +126,7 @@ class SummaryController < ApplicationController
                 if (summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][1]-ri_needed) >= summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][0]
                   # If after the RI modification I'm going to have enough RIs
                   #Rails.logger.debug("Change in the RI #{ri_id}, join in #{ri_needed} to type #{instances[instance_id][:type]}")
-                  recommendation[:count] = ri_needed
+                  recommendation[:count] = 1
                   summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][1] -= ri_needed
                   summary[instances[instance_id][:type]][instances[instance_id][:az]][ri[:platform]][instances[instance_id][:vpc]][ri[:tenancy]][1] += 1
                   reserved_instances[ri_id][:count] -= ri_needed
