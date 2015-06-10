@@ -12,4 +12,8 @@ class SetupController < ApplicationController
     redirect_to action: 'index'
   end
 
+  def clear_cache
+    Rails.cache.clear
+  end
+
 end
