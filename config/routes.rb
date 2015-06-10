@@ -13,6 +13,7 @@ Rails.application.routes.draw do
   get '/reservedinstances' => 'reserved_instances#index'
   get '/summary' => 'summary#index'
   get '/recommendations' => 'summary#recommendations'
+  post '/recommendations' => 'summary#apply_recommendations', as: 'apply_recommendations'
 
   # Example of regular route:
   #   get 'products/:id' => 'catalog#view'
