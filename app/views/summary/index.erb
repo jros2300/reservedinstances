@@ -1,6 +1,6 @@
 <h1>Summary</h1>
 
-<table class="table table-striped table-hover" id="data_table" data-pagination="true" data-search="true">
+<table class="table table-striped table-hover" id="data_table" data-pagination="true" data-search="true" data-row-style="rowStyle">
     <thead>
       <tr>
         <th>Instance type</th>
@@ -39,4 +39,17 @@
 $(function () {
     $('#data_table').bootstrapTable();
     });
+
+function rowStyle(row, index) {
+  inst = parseInt(row[5]);
+  reserv = parseInt(row[6]);
+
+  if (inst > reserv) {
+    return { classes: 'warning' };
+  }
+  if (reserv > inst) {
+    return { classes: 'danger' };
+  }
+  return {};
+}
 </script>
