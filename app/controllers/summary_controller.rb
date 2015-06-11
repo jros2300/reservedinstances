@@ -19,11 +19,11 @@ class SummaryController < ApplicationController
       calculate_excess(summary, excess)
       continue_iteration = iterate_recommendation(excess, instances, summary, reserved_instances, @recommendations)
     end
+    #@recommendations = consolidate_recommendations(@recommendations)
   end
 
   def apply_recommendations
-    #Rails.logger.debug(params)
-    recommendations = JSON.parse params[:recommendations_original]
+    recommendations = consolidate_recommendations(JSON.parse params[:recommendations_original])
     reserved_instances = get_reserved_instances(Setup.get_regions, get_account_ids)
     selected = params[:recommendations].split(",")
     selected.each do |index|
@@ -33,6 +33,21 @@ class SummaryController < ApplicationController
   end
 
   private
+
+  def consolidate_recommendations(recommendations)
+    new_recommendations = []
+    recommendations.each do |recommendation|
+      added = false
+      new_recommendations.each do |new_recommendation|
+        if new_recommendation[:rid]==recommendation[:rid] && new_recommendation[:az]==recommendation[:az] && new_recommendation[:type]==recommendation[:type] && new_recommendation[:vpc]==recommendation[:vpc] 
+          new_recommendation[:count] += recommendation[:count]
+          added = true
+        end
+      end
+      new_recommendations << {rid: recommendation[:rid], count: recommendation[:count], az: recommendation[:az], type: recommendation[:type], vpc: recommendation[:vpc]} if !added
+    end
+    return new_recommendations
+  end
 
   def iterate_recommendation(excess, instances, summary, reserved_instances, recommendations)
     excess.each do |family, elem1|

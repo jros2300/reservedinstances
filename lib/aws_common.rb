@@ -1,4 +1,5 @@
 module AwsCommon
+  require 'csv'
 
   METADATA_ENDPOINT = 'http://169.254.169.254/latest/meta-data/'
   def get_regions
@@ -13,6 +14,7 @@ module AwsCommon
   end
 
   def get_account_ids
+    return [['180179741841',''],['269898447219',''],['297144392530',''],['310028733292',''],['416743795203',''],['454226772460',''],['463879194824',''],['537205908513',''],['602794641042',''],['639212290688',''],['642900864480',''],['658243788766',''],['715140769385',''],['795478861756',''],['796285877930',''],['988851520197','']]
     Rails.cache.fetch("account_ids", expires_in: 1.hours) do
       iam = Aws::IAM::Client.new(region: 'eu-west-1')
       iam_data = Net::HTTP.get( URI.parse( METADATA_ENDPOINT + 'iam/info' ) )
@@ -46,6 +48,7 @@ module AwsCommon
   end
 
   def get_instances(regions, account_ids)
+    return get_mock_instances
     Rails.cache.fetch("instances", expires_in: 20.minutes) do
       instances = {}
       current_account_id = get_current_account_id
@@ -67,8 +70,17 @@ module AwsCommon
     end
   end
 
+  def get_mock_instances
+    instances = {}
+    CSV.foreach('/tmp/instances.csv', headers: true) do |row|
+      instances[row[1]] = {type: row[2], az: row[3], tenancy: row[4], platform: row[5].blank? ? "Linux" : "Windows", account_id: row[6], vpc: row[7].blank? ? "EC2 Classic" : "VPC"} if row[8] == 'running'
+    end
+    return instances
+  end
+
   def get_reserved_instances(regions, account_ids)
-    #Rails.cache.fetch("reserved_instances", expires_in: 20.minutes) do
+    return get_mock_reserved_instances
+    Rails.cache.fetch("reserved_instances", expires_in: 20.minutes) do
       instances = {}
       current_account_id = get_current_account_id
 
@@ -114,11 +126,34 @@ module AwsCommon
         end
       end
 
-      ########## INJECT SOME TEST DATA
-      #instances['rid1'] = {type: 't2.small', az: 'eu-west-1a', tenancy: 'default', account_id: '1111111', count: 2, description: 'Linux', vpc: 'Classic', platform: 'Windows'} 
-      ########## INJECT SOME TEST DATA
       instances
-    #end
+    end
+  end
+
+  def get_mock_reserved_instances
+    instances = {}
+    platforms = {}
+    CSV.foreach('/tmp/platforms.csv', headers: true) do |row|
+      platforms[row[2]] = row[1]
+    end
+    CSV.foreach('/tmp/ri.csv', headers: true) do |row|
+      if row[8] == 'active'
+        instances[row[1]] = {type: row[2], az: row[3], tenancy: row[4], account_id: row[5], count: row[6].to_i, description: row[7], role_arn: ''} 
+        if platforms[row[5]] == 'Classic'
+          instances[row[1]][:vpc] = row[7].include?("Amazon VPC") ? 'VPC' : 'EC2 Classic'
+        else
+          instances[row[1]][:vpc] = 'VPC'
+        end
+        if row[7].include? "Linux/UNIX"
+          instances[row[1]][:platform] = 'Linux'
+        elsif row[7].include?("Windows") && !row[7].include?("SQL Server")
+          instances[row[1]][:platform] = 'Windows'
+        else
+          instances[row[1]] = nil
+        end
+      end
+    end
+    return instances
   end
 
   def apply_recommendation(ri, recommendation)
