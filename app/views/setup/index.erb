@@ -10,6 +10,10 @@
         </label>
       <% end %>
     </div>
+    <div class="form-group">
+      <label>Automatically apply recommendations each</label></br>
+      <div class="col-xs-2"><%= text_field_tag "minutes", @minutes.to_s, class: 'form-control' %></div><span id="helpBlock" class="help-block">minutes (0 to stop)</span>
+    </div>
     <%= submit_tag("Save", class: 'btn btn-default') %>
   <% end %>
 

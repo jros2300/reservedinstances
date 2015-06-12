@@ -15,6 +15,9 @@ Rails.application.routes.draw do
   get '/summary' => 'summary#index'
   get '/recommendations' => 'summary#recommendations'
   post '/recommendations' => 'summary#apply_recommendations', as: 'apply_recommendations'
+  get '/logrecommendations' => 'summary#log_recommendations'
+
+  post '/periodicworker' => 'summary#periodic_worker'
 
 
   # Example of regular route:

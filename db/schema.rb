@@ -11,12 +11,26 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20150609101847) do
+ActiveRecord::Schema.define(version: 20150612115559) do
+
+  create_table "recommendations", force: :cascade do |t|
+    t.string   "rid"
+    t.string   "az"
+    t.string   "instancetype"
+    t.string   "vpc"
+    t.integer  "count"
+    t.datetime "timestamp"
+    t.string   "accountid"
+    t.datetime "created_at",   null: false
+    t.datetime "updated_at",   null: false
+  end
 
   create_table "setups", force: :cascade do |t|
     t.text     "regions"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer  "minutes"
+    t.datetime "nextrun"
   end
 
 end

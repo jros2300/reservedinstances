@@ -158,18 +158,28 @@ module AwsCommon
 
   def apply_recommendation(ri, recommendation)
     region = ri[:az][0..-2]
+=begin
     if ri[:account_id] == get_current_account_id
       ec2 = Aws::EC2::Client.new(region: region)
     else
       role_credentials = Aws::AssumeRoleCredentials.new( client: Aws::STS::Client.new(region: region), role_arn: ri[:role_arn], role_session_name: "reserved_instances" )
       ec2 = Aws::EC2::Client.new(region: region, credentials: role_credentials)
     end
+=end
     conf = {}
-    conf[:availability_zone] = recommendation["az"].nil? ? ri[:az] : recommendation["az"] 
-    conf[:platform] = recommendation["vpc"].nil? ? (ri[:vpc] == 'VPC' ? 'EC2-VPC' : 'EC2-Classic') : (recommendation["vpc"] == 'VPC' ? 'EC2-VPC' : 'EC2-Classic')
-    conf[:instance_count] = recommendation["count"] 
-    conf[:instance_type] = recommendation["type"].nil? ? ri[:type] : recommendation["type"] 
-    #Rails.logger.debug(conf)
-    ec2.modify_reserved_instances(reserved_instances_ids:[recommendation["rid"]], target_configurations: [conf])
+    conf[:availability_zone] = recommendation[:az].nil? ? ri[:az] : recommendation[:az] 
+    conf[:platform] = recommendation[:vpc].nil? ? (ri[:vpc] == 'VPC' ? 'EC2-VPC' : 'EC2-Classic') : (recommendation[:vpc] == 'VPC' ? 'EC2-VPC' : 'EC2-Classic')
+    conf[:instance_count] = recommendation[:count] 
+    conf[:instance_type] = recommendation[:type].nil? ? ri[:type] : recommendation[:type] 
+    #ec2.modify_reserved_instances(reserved_instances_ids:[recommendation[:rid]], target_configurations: [conf])
+    log = Recommendation.new
+    log.accountid = ri[:account_id]
+    log.rid = recommendation[:rid]
+    log.az = recommendation[:az] if !recommendation[:az].nil?
+    log.vpc = recommendation[:vpc] if !recommendation[:vpc].nil?
+    log.instancetype = recommendation[:type] if !recommendation[:type].nil?
+    log.count = recommendation[:count]
+    log.timestamp = DateTime.now
+    log.save
   end
 end
