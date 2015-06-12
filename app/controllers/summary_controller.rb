@@ -1,4 +1,6 @@
 class SummaryController < ApplicationController
+  skip_before_filter :verify_authenticity_token, :only => [:periodic_worker]
+
   include AwsCommon
   def index
     instances = get_instances(Setup.get_regions, get_account_ids)
@@ -23,13 +25,36 @@ class SummaryController < ApplicationController
   end
 
   def apply_recommendations
-    recommendations = consolidate_recommendations(JSON.parse params[:recommendations_original])
+    recommendations = JSON.parse(params[:recommendations_original], :symbolize_names => true)
     reserved_instances = get_reserved_instances(Setup.get_regions, get_account_ids)
     selected = params[:recommendations].split(",")
+    selected_recommendations = []
     selected.each do |index|
-      ri = reserved_instances[recommendations[index.to_i]["rid"]]
-      apply_recommendation(ri, recommendations[index.to_i])
+      selected_recommendations << recommendations[index.to_i]
     end
+    selected_recommendations = consolidate_recommendations(selected_recommendations)
+    selected_recommendations.each do |recommendation|
+      ri = reserved_instances[recommendation[:rid]]
+      apply_recommendation(ri, recommendation)
+    end
+  end
+
+  def periodic_worker
+    if Setup.now_after_next
+      Setup.update_next
+      Rails.cache.clear
+      recommendations
+      reserved_instances = get_reserved_instances(Setup.get_regions, get_account_ids)
+      @recommendations = consolidate_recommendations(@recommendations)
+      @recommendations.each do |recommendation|
+        ri = reserved_instances[recommendation[:rid]]
+        apply_recommendation(ri, recommendation)
+      end
+    end
+  end
+
+  def log_recommendations
+    @recommendations = Recommendation.all
   end
 
   private
@@ -208,6 +233,8 @@ class SummaryController < ApplicationController
       32
     when "8xlarge"
       64
+    when "10xlarge"
+      80
     else
       0
     end
