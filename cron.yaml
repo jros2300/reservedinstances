@@ -2,4 +2,4 @@ version: 1
 cron:
   - name: "apply-recommendations-job"          
     url: "/periodicworker"              
-    schedule: "0/5 * * * *"    
+    schedule: "*/5 * * * *"    
