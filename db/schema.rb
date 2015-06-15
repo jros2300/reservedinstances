@@ -11,7 +11,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20150612115559) do
+ActiveRecord::Schema.define(version: 20150615090544) do
 
   create_table "recommendations", force: :cascade do |t|
     t.string   "rid"
@@ -31,6 +31,7 @@ ActiveRecord::Schema.define(version: 20150612115559) do
     t.datetime "updated_at", null: false
     t.integer  "minutes"
     t.datetime "nextrun"
+    t.string   "password"
   end
 
 end

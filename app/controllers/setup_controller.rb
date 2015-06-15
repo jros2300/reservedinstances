@@ -9,7 +9,10 @@ class SetupController < ApplicationController
 
   def change
     Setup.put_regions params[:regions]
-    Setup.put_minutes params[:minutes] if params[:minutes].to_i > 30 || params[:minutes].to_i == 0
+    if !params[:minutes].blank?
+      Setup.put_minutes params[:minutes] if params[:minutes].to_i >= 30 || params[:minutes].to_i == 0 
+    end
+    Setup.put_password params[:password] if !params[:password].blank?
     Rails.cache.clear
     redirect_to action: 'index'
   end

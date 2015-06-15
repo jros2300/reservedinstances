@@ -51,6 +51,7 @@ class SummaryController < ApplicationController
         apply_recommendation(ri, recommendation)
       end
     end
+    render :nothing => true, :status => 200, :content_type => 'text/html'
   end
 
   def log_recommendations
