@@ -14,7 +14,7 @@ module AwsCommon
   end
 
   def get_account_ids
-    return [['180179741841',''],['269898447219',''],['297144392530',''],['310028733292',''],['416743795203',''],['454226772460',''],['463879194824',''],['537205908513',''],['602794641042',''],['639212290688',''],['642900864480',''],['658243788766',''],['715140769385',''],['795478861756',''],['796285877930',''],['988851520197','']]
+    #return []
     Rails.cache.fetch("account_ids", expires_in: 1.hours) do
       iam = Aws::IAM::Client.new(region: 'eu-west-1')
       iam_data = Net::HTTP.get( URI.parse( METADATA_ENDPOINT + 'iam/info' ) )
@@ -29,7 +29,6 @@ module AwsCommon
           end
         end
       end
-      #Rails.logger.debug(account_ids)
       return account_ids
     end
   end
@@ -48,7 +47,7 @@ module AwsCommon
   end
 
   def get_instances(regions, account_ids)
-    return get_mock_instances
+    #return get_mock_instances
     Rails.cache.fetch("instances", expires_in: 20.minutes) do
       instances = {}
       current_account_id = get_current_account_id
@@ -79,7 +78,7 @@ module AwsCommon
   end
 
   def get_reserved_instances(regions, account_ids)
-    return get_mock_reserved_instances
+    #return get_mock_reserved_instances
     Rails.cache.fetch("reserved_instances", expires_in: 20.minutes) do
       instances = {}
       current_account_id = get_current_account_id
@@ -158,20 +157,21 @@ module AwsCommon
 
   def apply_recommendation(ri, recommendation)
     region = ri[:az][0..-2]
-=begin
+# =begin
     if ri[:account_id] == get_current_account_id
       ec2 = Aws::EC2::Client.new(region: region)
     else
       role_credentials = Aws::AssumeRoleCredentials.new( client: Aws::STS::Client.new(region: region), role_arn: ri[:role_arn], role_session_name: "reserved_instances" )
       ec2 = Aws::EC2::Client.new(region: region, credentials: role_credentials)
     end
-=end
+# =end
     conf = {}
     conf[:availability_zone] = recommendation[:az].nil? ? ri[:az] : recommendation[:az] 
     conf[:platform] = recommendation[:vpc].nil? ? (ri[:vpc] == 'VPC' ? 'EC2-VPC' : 'EC2-Classic') : (recommendation[:vpc] == 'VPC' ? 'EC2-VPC' : 'EC2-Classic')
     conf[:instance_count] = recommendation[:count] 
     conf[:instance_type] = recommendation[:type].nil? ? ri[:type] : recommendation[:type] 
-    #ec2.modify_reserved_instances(reserved_instances_ids:[recommendation[:rid]], target_configurations: [conf])
+    # Comment to mock
+    ec2.modify_reserved_instances(reserved_instances_ids:[recommendation[:rid]], target_configurations: [conf])
     log = Recommendation.new
     log.accountid = ri[:account_id]
     log.rid = recommendation[:rid]

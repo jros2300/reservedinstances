@@ -1,9 +1,11 @@
 class Setup < ActiveRecord::Base
+  require 'bcrypt'
+
   def self.get_minutes
     minutes = 0
     setup = Setup.first
     if !setup.nil?
-      minutes = setup.minutes
+      minutes = setup.minutes if !setup.minutes.nil?
     end
     return minutes
   end
@@ -17,15 +19,36 @@ class Setup < ActiveRecord::Base
     setup.save
   end
 
+  def self.get_password
+    password = BCrypt::Password.create(ENV['DEFAULT_PASSWORD'])
+    setup = Setup.first
+    if !setup.nil? && !setup.password.nil?
+      password = setup.password
+    end
+    return password
+  end
+
+  def self.put_password(password)
+    setup = Setup.first
+    setup = Setup.new if setup.nil?
+
+    setup.password = BCrypt::Password.create(password)
+    setup.save
+  end
+
+  def self.test_password(password)
+    return BCrypt::Password.new(get_password).is_password? password
+  end
+
   def self.update_next
     minutes = 0
     setup = Setup.first
     if !setup.nil?
-      minutes = setup.minutes
+      minutes = setup.minutes if !setup.minutes.nil?
     end
 
     if minutes > 0
-      setup.nextrun = DateTime.now + minutes.minutes
+      setup.nextrun = Time.current + minutes.minutes
       setup.save
     end
   end
@@ -34,7 +57,7 @@ class Setup < ActiveRecord::Base
     after_next = false
     setup = Setup.first
     if !setup.nil?
-      after_next = (setup.nextrun > DateTime.now)
+      after_next = (setup.nextrun < Time.current)
     end
     return after_next
   end
@@ -42,7 +65,7 @@ class Setup < ActiveRecord::Base
   def self.get_regions
     regions = {"eu-west-1"=> false, "us-east-1"=> false, "eu-central-1"=> false, "us-west-1"=> false, "us-west-2"=> false, "ap-southeast-1"=> false, "ap-southeast-2"=> false, "ap-northeast-1"=> false, "sa-east-1"=> false}
     setup = Setup.first
-    if !setup.nil?
+    if !setup.nil? && !setup.regions.nil?
       regions_text = setup.regions
       regions_list = regions_text.split ","
       regions_list.each do |region|

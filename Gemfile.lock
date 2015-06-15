@@ -45,6 +45,7 @@ GEM
       multi_json (~> 1.0)
     aws-sdk-resources (2.0.48)
       aws-sdk-core (= 2.0.48)
+    bcrypt (3.1.10)
     binding_of_caller (0.7.2)
       debug_inspector (>= 0.0.1)
     builder (3.2.2)
@@ -95,6 +96,7 @@ GEM
     mini_portile (0.6.2)
     minitest (5.7.0)
     multi_json (1.11.0)
+    mysql2 (0.3.18)
     nokogiri (1.6.6.2)
       mini_portile (~> 0.6.0)
     rack (1.6.1)
@@ -175,11 +177,13 @@ PLATFORMS
 
 DEPENDENCIES
   aws-sdk
+  bcrypt
   coffee-rails (~> 4.1.0)
   debugger
   jbuilder (~> 2.0)
   jquery-rails
   less-rails
+  mysql2
   rails (= 4.2.1)
   sass-rails (~> 5.0)
   sdoc (~> 0.4.0)

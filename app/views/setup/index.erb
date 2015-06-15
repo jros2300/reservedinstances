@@ -1,6 +1,6 @@
 <div>
   <h1>Setup</h1>
-  <%= form_tag(change_setup_path) do %>
+  <%= form_tag(change_setup_path, :onsubmit => "return validateform()") do %>
     <div class="form-group">
       <label>Regions in use</label></br>
       <% @regions.keys.each do |region| %>
@@ -12,9 +12,24 @@
     </div>
     <div class="form-group">
       <label>Automatically apply recommendations each</label></br>
-      <div class="col-xs-2"><%= text_field_tag "minutes", @minutes.to_s, class: 'form-control' %></div><span id="helpBlock" class="help-block">minutes (0 to stop)</span>
+      <div class="col-xs-2"><%= number_field_tag "minutes", @minutes.to_s, min:0, id: 'minutestext', class: 'form-control' %></div><span id="helpBlock" class="help-block">minutes (0 to stop, minimum 30)</span>
+    </div>
+    <div class="form-group">
+      <label>Change Password</label></br>
+      <%= password_field_tag 'password', nil, class: 'form-control' %>
     </div>
     <%= submit_tag("Save", class: 'btn btn-default') %>
   <% end %>
 
 </div>
+
+<script type="text/javascript">
+function validateform() {
+  minutes = parseInt($('#minutestext').val());
+  if (minutes != 0 && minutes < 30) {
+    return false;
+  }
+  return true;
+}
+</script>
+
