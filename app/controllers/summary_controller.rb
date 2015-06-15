@@ -1,5 +1,7 @@
 class SummaryController < ApplicationController
   skip_before_filter :verify_authenticity_token, :only => [:periodic_worker]
+  skip_before_filter :authenticate, :only => [:periodic_worker]
+  before_filter :authenticate_local, :only => [:periodic_worker]
 
   include AwsCommon
   def index
@@ -263,5 +265,9 @@ class SummaryController < ApplicationController
     end
 
     return summary
+  end
+
+  def authenticate_local
+    render :nothing => true, :status => :unauthorized if !Socket.ip_address_list.map {|x| x.ip_address}.include?(request.remote_ip)
   end
 end
