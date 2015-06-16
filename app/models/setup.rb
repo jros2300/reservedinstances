@@ -15,8 +15,8 @@ class Setup < ActiveRecord::Base
     setup = Setup.new if setup.nil?
 
     setup.minutes = minutes
-    update_next
     setup.save
+    update_next
   end
 
   def self.get_password
@@ -56,7 +56,7 @@ class Setup < ActiveRecord::Base
   def self.now_after_next
     after_next = false
     setup = Setup.first
-    if !setup.nil?
+    if !setup.nil? && !setup.nextrun.nil?
       after_next = (setup.nextrun < Time.current)
     end
     return after_next

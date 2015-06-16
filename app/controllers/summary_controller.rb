@@ -46,6 +46,7 @@ class SummaryController < ApplicationController
       Setup.update_next
       Rails.cache.clear
       recommendations
+      Rails.cache.clear
       reserved_instances = get_reserved_instances(Setup.get_regions, get_account_ids)
       @recommendations = consolidate_recommendations(@recommendations)
       @recommendations.each do |recommendation|
