@@ -132,10 +132,30 @@ You also need:
   * $ irb
   * >> require 'securerandom'
   * >> SecureRandom.hex(64)
+* Download the CloudFormation template from here: https://raw.githubusercontent.com/jros2300/reservedinstances/master/reservedinstances.cform
 
 You need also this application in S3, you can download the last version and upload to any S3 bucket, or you can use the default values and use the one I maintain.
 
-Then you should go to the console in the account1, and select the service CloudFormation.
+Then you should go to the console in the account1, and select the service CloudFormation. Create a new stack and upload the template, complete all the parameters and create the stack. Once the stack is created you can access the application using the URL you can find in the Output of the stack.
+
+
+## Usage
+You can access the tool using the URL you can find in the output of the Stack. You should use the default password you put in the parameters of the Stack (you can left the username blank).
+
+Once in the tool you should configure it:
+
+* Regions in use: Select all the regions you're using in all your accounts. You can select all the regions, but you can filter out the regions you're not using to improve the performance of the tool
+* Automatically apply recommendations each: If you introduce 0, then there is not going to be any automatic mofification of the RIs. If you introduce any other number (more than 30), each that number of minutes the application is going to apply all the recommendations automatically
+* Change Password: You can introduce a new password for the tool
+
+In the tool there are several options:
+
+* Instances: You can see all your running instances in all the accounts, you can search by any field
+* Reserved Instances: You can see all your reserved instances in all the accounts
+* Summary: You can see a summary of your instances and reserved instances. You can see where you have more instances than reserved instances (yellow), and where you have more RIs than instances (red)
+* Recommendations: You can see all the recommended modificaions in your RIs, you can select all the modifications of a subset of them and apply the modifications to your RIs from the tool
+* Log: You'll see all the recommended modifications to your RIs applied by the tool, in the Recommendations option, or automatically by the periodic task
+* Clear Cache: The tool create a cache of 20 minutes of all the API calls, if you want to get the last data then you can clear the cache and then select any other option
 
 
 
