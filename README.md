@@ -122,5 +122,21 @@ If you only have one account, or if you have multiple accounts in the account1, 
 
 You can add as many accouts as you need to the policy. You can use all your linked accounts or a subset of them.
 
+You also need:
+
+* 1 VPC
+* 2 Subnets
+* 1 KeyPair
+* 1 SSL Cert ARN (http://docs.aws.amazon.com/IAM/latest/UserGuide/ManagingServerCerts.html)
+* 1 Rails Secret Key (You can generate it in any computer with Ruby installed, just run:
+  * $ irb
+  * >> require 'securerandom'
+  * >> SecureRandom.hex(64)
+
+You need also this application in S3, you can download the last version and upload to any S3 bucket, or you can use the default values and use the one I maintain.
+
+Then you should go to the console in the account1, and select the service CloudFormation.
+
+
 
 

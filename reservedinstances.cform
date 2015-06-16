@@ -1,0 +1,211 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "Reserved Instances Management Tool",
+  "Parameters" : {
+    "DBUser": {
+      "Type" : "String",
+      "Default" : "riuser",
+      "Description" : "Name of DB username",
+      "MinLength": "1",
+          "MaxLength": "16",
+          "AllowedPattern" : "[a-zA-Z][a-zA-Z0-9]*",
+          "ConstraintDescription" : "must begin with a letter and contain only alphanumeric characters."
+    },
+    "DBPassword": {
+      "Type" : "String",
+      "Description" : "Database password",
+      "NoEcho" : "true",
+      "MinLength": "8",
+          "MaxLength": "41",
+          "AllowedPattern" : "[a-zA-Z0-9]*",
+          "ConstraintDescription" : "must contain only alphanumeric characters."
+    },
+    "RailsSecretKey": {
+      "Type" : "String",
+      "Description" : "Rails secret key, generated with 'rake secret'",
+      "NoEcho" : "true"
+    },
+    "VPC": {
+      "Type" : "AWS::EC2::VPC::Id",
+      "Description" : "VPC to install the application"
+    },
+    "DBSubnet1": {
+      "Type" : "AWS::EC2::Subnet::Id",
+      "Description" : "You need to select two subnets in the VPC selected for the DB"
+    },
+    "DBSubnet2": {
+      "Type" : "AWS::EC2::Subnet::Id",
+      "Description" : "Second subnet in the VPC"
+    },
+    "EC2Subnet": {
+      "Type" : "AWS::EC2::Subnet::Id",
+      "Description" : "Subnet in the VPC for the web server"
+    },
+    "S3Bucket": {
+      "Type" : "String",
+      "Description" : "S3 Bucket with the source code",
+      "Default": "amzsup"
+    },
+    "S3Key": {
+      "Type" : "String",
+      "Description" : "S3 Key with the source code",
+      "Default": "reservedinstances-master.zip"
+    },
+    "KeyName": {
+          "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the Elastic Beanstalk hosts",
+          "Type": "AWS::EC2::KeyPair::KeyName",
+          "ConstraintDescription" : "must be the name of an existing EC2 KeyPair."
+      },
+      "IamInstanceProfile": {
+        "Description" : "Instance profile created to allow the access to all the linked accounts",
+        "Type": "String",
+        "Default": "reservedinstances"
+      },
+      "DefaultPassword": {
+        "Type" : "String",
+      "Description" : "Application default password, you can change it later in the tool",
+      "NoEcho" : "true"
+      },
+      "SSLCertARN": {
+        "Type" : "String",
+      "Description" : "ARN of a SSL Cert (use 'aws iam list-server-certificates')"
+      }
+  },
+  "Resources" : {
+      "WebServerSecurityGroup" : {
+        "Type" : "AWS::EC2::SecurityGroup",
+        "Properties" : {
+            "GroupDescription" : "Enable HTTP access via port 80 and SSH access",
+            "SecurityGroupIngress" : [
+              {"IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "CidrIp" : "0.0.0.0/0"},
+              {"IpProtocol" : "tcp", "FromPort" : "22", "ToPort" : "22", "CidrIp" : "0.0.0.0/0"}
+            ],
+            "VpcId": { "Ref": "VPC"}
+        }
+    },
+      "DbSecurityByEC2SecurityGroup" : {
+          "Type" : "AWS::RDS::DBSecurityGroup",
+          "Properties" : {
+              "GroupDescription" : "Ingress for Amazon Reserved Instaces DB",
+              "EC2VpcId" : { "Ref": "VPC" },
+              "DBSecurityGroupIngress" : { "EC2SecurityGroupId": { "Ref": "WebServerSecurityGroup" } }
+          }
+        },
+        "MyDBSubnetGroup" : {
+          "Type" : "AWS::RDS::DBSubnetGroup",
+          "Properties" : {
+              "DBSubnetGroupDescription" : "DB Subnet for Reserved Instances tool",
+              "SubnetIds" : [ { "Ref" : "DBSubnet1" }, {"Ref": "DBSubnet2"} ]
+          }
+        },
+      "myDB" : {
+          "Type" : "AWS::RDS::DBInstance",
+          "Properties" : {
+            "AllocatedStorage" : "5",
+            "DBInstanceClass" : "db.t2.micro",
+            "Engine" : "MySQL",
+            "MasterUsername" : { "Ref" : "DBUser" },
+            "MasterUserPassword" : { "Ref" : "DBPassword" },
+            "StorageType": "standard",
+            "DBName": "ritooldb",
+            "DBSecurityGroups" : [ { "Ref" : "DbSecurityByEC2SecurityGroup" } ],
+              "DBSubnetGroupName" : { "Ref" : "MyDBSubnetGroup" }
+          }
+      },
+      "RIApplication" : {
+          "Type" : "AWS::ElasticBeanstalk::Application",
+          "Properties" : {
+          "Description" : "Reserved Instances Tool Application"
+          }
+        },  
+        "RIApplicationVersion" : {
+          "Type" : "AWS::ElasticBeanstalk::ApplicationVersion",
+          "Properties" : {
+            "Description" : "Version 1.0",
+            "ApplicationName" : { "Ref" : "RIApplication" },
+            "SourceBundle" : {
+                "S3Bucket" : {"Ref": "S3Bucket"},
+                "S3Key" : {"Ref": "S3Key"}
+            }
+          }
+      },
+      "RIEnvironment" : {
+          "Type" : "AWS::ElasticBeanstalk::Environment",
+          "Properties" : {
+            "ApplicationName" : { "Ref" : "RIApplication" },
+            "Description" :  "Reserved Instances Tool Application Web Server",
+            "SolutionStackName" : "64bit Amazon Linux 2015.03 v1.4.1 running Ruby 2.2 (Passenger Standalone)",
+            "VersionLabel" : { "Ref" : "RIApplicationVersion" },
+            "OptionSettings" : [
+                {"Namespace" : "aws:autoscaling:launchconfiguration", "OptionName" : "SecurityGroups", "Value" : { "Ref" : "WebServerSecurityGroup" }},
+                {"Namespace" : "aws:autoscaling:launchconfiguration", "OptionName" : "EC2KeyName", "Value" : { "Ref" : "KeyName" }},
+                {"Namespace" : "aws:autoscaling:launchconfiguration", "OptionName" : "InstanceType", "Value" : "t2.micro"},
+                {"Namespace" : "aws:ec2:vpc", "OptionName" : "VPCId", "Value" : { "Ref" : "VPC" }},
+                {"Namespace" : "aws:ec2:vpc", "OptionName" : "Subnets", "Value" : { "Ref" : "EC2Subnet" }},
+                {"Namespace" : "aws:ec2:vpc", "OptionName" : "ELBSubnets", "Value" : { "Ref" : "EC2Subnet" }},
+                {"Namespace" : "aws:ec2:vpc", "OptionName" : "AssociatePublicIpAddress", "Value" : "true"},
+                {"Namespace" : "aws:autoscaling:asg", "OptionName" : "MinSize", "Value" : "1"},
+                {"Namespace" : "aws:autoscaling:asg", "OptionName" : "MaxSize", "Value" : "1"},
+                {"Namespace" : "aws:elasticbeanstalk:environment", "OptionName" : "EnvironmentType", "Value" : "LoadBalanced"},
+                {"Namespace" : "aws:elb:loadbalancer", "OptionName" : "LoadBalancerHTTPPort", "Value" : "OFF"},
+                {"Namespace" : "aws:elb:loadbalancer", "OptionName" : "LoadBalancerHTTPSPort", "Value" : "443"},
+                {"Namespace" : "aws:elb:loadbalancer", "OptionName" : "SSLCertificateId", "Value" : {"Ref": "SSLCertARN"}},
+                {"Namespace" : "aws:elasticbeanstalk:application:environment", "OptionName" : "RDS_DB_NAME", "Value" : "ritooldb"},
+                {"Namespace" : "aws:elasticbeanstalk:application:environment", "OptionName" : "RDS_HOSTNAME", "Value" : {"Fn::GetAtt": ["myDB", "Endpoint.Address"]}},
+                {"Namespace" : "aws:elasticbeanstalk:application:environment", "OptionName" : "RDS_PASSWORD", "Value" : {"Ref": "DBPassword"}},
+                {"Namespace" : "aws:elasticbeanstalk:application:environment", "OptionName" : "RDS_USERNAME", "Value" : {"Ref": "DBUser"}},
+                {"Namespace" : "aws:elasticbeanstalk:application:environment", "OptionName" : "SECRET_KEY_BASE", "Value" : {"Ref": "RailsSecretKey"}},
+                {"Namespace" : "aws:elasticbeanstalk:application:environment", "OptionName" : "DEFAULT_PASSWORD", "Value" : {"Ref": "DefaultPassword"}},
+                {"Namespace": "aws:autoscaling:launchconfiguration", "OptionName": "IamInstanceProfile", "Value": { "Ref": "IamInstanceProfile" }}
+            ]
+          }
+        },
+    "MyQueue" : {
+          "Type" : "AWS::SQS::Queue",
+          "Properties" : {
+            "QueueName" : "ritoolqueue"
+          }
+      },
+        "RIEnvironmentWorker" : {
+          "Type" : "AWS::ElasticBeanstalk::Environment",
+          "Properties" : {
+            "ApplicationName" : { "Ref" : "RIApplication" },
+            "Description" :  "Reserved Instances Tool Worker to apply the recommendations automatically",
+            "SolutionStackName" : "64bit Amazon Linux 2015.03 v1.4.1 running Ruby 2.2 (Passenger Standalone)",
+            "VersionLabel" : { "Ref" : "RIApplicationVersion" },
+            "Tier" : {
+              "Type": "SQS/HTTP",
+              "Name": "Worker",
+              "Version": "2.0"
+            },
+            "OptionSettings" : [
+                {"Namespace" : "aws:autoscaling:launchconfiguration", "OptionName" : "SecurityGroups", "Value" : { "Ref" : "WebServerSecurityGroup" }},
+                {"Namespace" : "aws:autoscaling:launchconfiguration", "OptionName" : "EC2KeyName", "Value" : { "Ref" : "KeyName" }},
+                {"Namespace" : "aws:autoscaling:launchconfiguration", "OptionName" : "InstanceType", "Value" : "t2.micro"},
+                {"Namespace" : "aws:ec2:vpc", "OptionName" : "VPCId", "Value" : { "Ref" : "VPC" }},
+                {"Namespace" : "aws:ec2:vpc", "OptionName" : "Subnets", "Value" : { "Ref" : "EC2Subnet" }},
+                {"Namespace" : "aws:ec2:vpc", "OptionName" : "AssociatePublicIpAddress", "Value" : "true"},
+                {"Namespace" : "aws:autoscaling:asg", "OptionName" : "MinSize", "Value" : "1"},
+                {"Namespace" : "aws:autoscaling:asg", "OptionName" : "MaxSize", "Value" : "1"},
+                {"Namespace" : "aws:elasticbeanstalk:sqsd", "OptionName" : "WorkerQueueURL", "Value" : {"Ref": "MyQueue"}},
+                {"Namespace" : "aws:elasticbeanstalk:environment", "OptionName" : "EnvironmentType", "Value" : "SingleInstance"},
+                {"Namespace" : "aws:elasticbeanstalk:application:environment", "OptionName" : "RDS_DB_NAME", "Value" : "ritooldb"},
+                {"Namespace" : "aws:elasticbeanstalk:application:environment", "OptionName" : "RDS_HOSTNAME", "Value" : {"Fn::GetAtt": ["myDB", "Endpoint.Address"]}},
+                {"Namespace" : "aws:elasticbeanstalk:application:environment", "OptionName" : "RDS_PASSWORD", "Value" : {"Ref": "DBPassword"}},
+                {"Namespace" : "aws:elasticbeanstalk:application:environment", "OptionName" : "RDS_USERNAME", "Value" : {"Ref": "DBUser"}},
+                {"Namespace" : "aws:elasticbeanstalk:application:environment", "OptionName" : "SECRET_KEY_BASE", "Value" : {"Ref": "RailsSecretKey"}},
+                {"Namespace" : "aws:elasticbeanstalk:application:environment", "OptionName" : "DEFAULT_PASSWORD", "Value" : {"Ref": "DefaultPassword"}},
+                {"Namespace": "aws:autoscaling:launchconfiguration", "OptionName": "IamInstanceProfile", "Value": { "Ref": "IamInstanceProfile" }}
+            ]
+          }
+        }
+  },
+  "Outputs" : {
+    "URL" : {
+          "Description" : "The URL of the Application",
+          "Value" :  { "Fn::Join" : [ "", [ "https://", { "Fn::GetAtt" : ["RIEnvironment", "EndpointURL"] }]]}
+      }
+  }
+}   
+
+    
