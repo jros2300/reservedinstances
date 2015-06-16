@@ -16,6 +16,7 @@ Rails.application.routes.draw do
   get '/recommendations' => 'summary#recommendations'
   post '/recommendations' => 'summary#apply_recommendations', as: 'apply_recommendations'
   get '/logrecommendations' => 'summary#log_recommendations'
+  get '/health' => 'summary#health'
 
   post '/periodicworker' => 'summary#periodic_worker'
 

@@ -1,6 +1,6 @@
 class SummaryController < ApplicationController
-  skip_before_filter :verify_authenticity_token, :only => [:periodic_worker]
-  skip_before_filter :authenticate, :only => [:periodic_worker]
+  skip_before_filter :verify_authenticity_token, :only => [:periodic_worker, :health]
+  skip_before_filter :authenticate, :only => [:periodic_worker, :health]
   before_filter :authenticate_local, :only => [:periodic_worker]
 
   include AwsCommon
@@ -8,6 +8,10 @@ class SummaryController < ApplicationController
     instances = get_instances(Setup.get_regions, get_account_ids)
     reserved_instances = get_reserved_instances(Setup.get_regions, get_account_ids)
     @summary = get_summary(instances,reserved_instances)
+  end
+
+  def health
+    render :nothing => true, :status => 200, :content_type => 'text/html'
   end
 
   def recommendations
