@@ -38,7 +38,7 @@
 
 <script type="text/javascript">
 $(function () {
-    $('#recommendations_table').bootstrapTable();
+    $('#recommendations_table').bootstrapTable({showExport: true});
     $('#apply').click(function () {
       var sel = $('#recommendations_table').bootstrapTable('getSelections');
       if (sel.length > 0) {
