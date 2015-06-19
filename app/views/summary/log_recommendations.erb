@@ -1,4 +1,4 @@
-<h1>Applied recommendations log</h1>
+<h1>General log</h1>
 <table class="table table-striped table-hover" id="data_table" data-pagination="true" data-search="true">
   <thead>
     <tr>
@@ -9,6 +9,7 @@
       <th>New availability zone</th>
       <th>New network</th>
       <th>Time applied</th>
+      <th>Result</th>
     </tr>
   </thead>
   <tbody>
@@ -21,6 +22,7 @@
         <td><%= recommendation.az %></td>
         <td><%= recommendation.vpc %></td>
         <td><%= recommendation.timestamp %></td>
+        <td><%= @failed_recommendations.include?(recommendation.rid) ? '<span class="glyphicon glyphicon-remove" style="color:red"></span>'.html_safe : '<span class="glyphicon glyphicon-ok" style="color:green"></span>'.html_safe %></td>
       </tr>
     <% end %>
   </tbody>

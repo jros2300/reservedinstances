@@ -63,6 +63,7 @@ class SummaryController < ApplicationController
 
   def log_recommendations
     @recommendations = Recommendation.all
+    @failed_recommendations = get_failed_modifications(Setup.get_regions, get_account_ids)
   end
 
   private
@@ -113,7 +114,7 @@ class SummaryController < ApplicationController
 
     # First look for AZ or VPC changes
     reserved_instances.each do |ri_id, ri|
-      if !ri.nil? && ri[:type].split(".")[0] == family && ri[:az][0..-2] == region && ri[:platform] == platform && ri[:tenancy] == tenancy
+      if !ri.nil? && ri[:type].split(".")[0] == family && ri[:az][0..-2] == region && ri[:platform] == platform && ri[:tenancy] == tenancy && ri[:status] == 'active'
         # This reserved instance is of the usable type
         if summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][1] > summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][0]
           # If for this reservation type we have excess of RIs
@@ -144,7 +145,7 @@ class SummaryController < ApplicationController
 
     # Now I look for type changes
     reserved_instances.each do |ri_id, ri|
-      if !ri.nil? && ri[:type].split(".")[0] == family && ri[:az][0..-2] == region && ri[:platform] == platform && ri[:tenancy] == tenancy
+      if !ri.nil? && ri[:type].split(".")[0] == family && ri[:az][0..-2] == region && ri[:platform] == platform && ri[:tenancy] == tenancy && ri[:status] == 'active'
         # This reserved instance is of the usable type
         if summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][1] > summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][0]
           # If for this reservation type we have excess of RIs
@@ -261,12 +262,14 @@ class SummaryController < ApplicationController
     end
 
     reserved_instances.each do |ri_id, ri|
-      summary[ri[:type]] = {} if summary[ri[:type]].nil?
-      summary[ri[:type]][ri[:az]] = {} if summary[ri[:type]][ri[:az]].nil?
-      summary[ri[:type]][ri[:az]][ri[:platform]] = {} if summary[ri[:type]][ri[:az]][ri[:platform]].nil?
-      summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]] = {} if summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]].nil?
-      summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]] = [0,0] if summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]].nil?
-      summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][1] += ri[:count]
+      if ri[:status] == 'active'
+        summary[ri[:type]] = {} if summary[ri[:type]].nil?
+        summary[ri[:type]][ri[:az]] = {} if summary[ri[:type]][ri[:az]].nil?
+        summary[ri[:type]][ri[:az]][ri[:platform]] = {} if summary[ri[:type]][ri[:az]][ri[:platform]].nil?
+        summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]] = {} if summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]].nil?
+        summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]] = [0,0] if summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]].nil?
+        summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][1] += ri[:count]
+      end
     end
 
     return summary
