@@ -7,7 +7,6 @@
       <th>Count</th>
       <th>New type</th>
       <th>New availability zone</th>
-      <th>New network</th>
       <th>Time applied</th>
       <th>Result</th>
     </tr>
@@ -20,7 +19,6 @@
         <td><%= recommendation.count %></td>
         <td><%= recommendation.instancetype %></td>
         <td><%= recommendation.az %></td>
-        <td><%= recommendation.vpc %></td>
         <td><%= recommendation.timestamp %></td>
         <td><%= @failed_recommendations.include?(recommendation.rid) ? '<span class="glyphicon glyphicon-remove" style="color:red"></span>'.html_safe : '<span class="glyphicon glyphicon-ok" style="color:green"></span>'.html_safe %></td>
       </tr>

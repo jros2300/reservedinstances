@@ -105,18 +105,18 @@ class SummaryController < ApplicationController
     instances.each do |instance_id, instance|
       if instance[:type].split(".")[0] == family && instance[:az][0..-2] == region && instance[:platform] == platform && instance[:tenancy] == tenancy
         # This instance is of the usable type
-        if summary[instance[:type]][instance[:az]][instance[:platform]][instance[:vpc]][instance[:tenancy]][0] > summary[instance[:type]][instance[:az]][instance[:platform]][instance[:vpc]][instance[:tenancy]][1]
+        if summary[instance[:type]][instance[:az]][instance[:platform]][instance[:tenancy]][0] > summary[instance[:type]][instance[:az]][instance[:platform]][instance[:tenancy]][1]
           # If for this instance type we have excess of instances
           excess_instance << instance_id
         end
       end
     end
 
-    # First look for AZ or VPC changes
+    # First look for AZ changes
     reserved_instances.each do |ri_id, ri|
       if !ri.nil? && ri[:type].split(".")[0] == family && ri[:az][0..-2] == region && ri[:platform] == platform && ri[:tenancy] == tenancy && ri[:status] == 'active'
         # This reserved instance is of the usable type
-        if summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][1] > summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][0]
+        if summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1] > summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][0]
           # If for this reservation type we have excess of RIs
           # I'm going to look for an instance which can use this reservation
           excess_instance.each do |instance_id|
@@ -127,12 +127,8 @@ class SummaryController < ApplicationController
                 recommendation[:az] = instances[instance_id][:az]
                 #Rails.logger.debug("Change in the RI #{ri_id}, to az #{instances[instance_id][:az]}")
               end
-              if instances[instance_id][:vpc] != ri[:vpc]
-                recommendation[:vpc] = instances[instance_id][:vpc]
-                #Rails.logger.debug("Change in the RI #{ri_id}, to vpc #{instances[instance_id][:vpc]}")
-              end
-              summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][1] -= 1
-              summary[ri[:type]][instances[instance_id][:az]][ri[:platform]][instances[instance_id][:vpc]][ri[:tenancy]][1] += 1
+              summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1] -= 1
+              summary[ri[:type]][instances[instance_id][:az]][ri[:platform]][ri[:tenancy]][1] += 1
               reserved_instances[ri_id][:count] -= 1
               reserved_instances[ri_id] = nil if reserved_instances[ri_id][:count] == 0
               recommendations << recommendation
@@ -144,44 +140,48 @@ class SummaryController < ApplicationController
     end
 
     # Now I look for type changes
-    reserved_instances.each do |ri_id, ri|
-      if !ri.nil? && ri[:type].split(".")[0] == family && ri[:az][0..-2] == region && ri[:platform] == platform && ri[:tenancy] == tenancy && ri[:status] == 'active'
-        # This reserved instance is of the usable type
-        if summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][1] > summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][0]
-          # If for this reservation type we have excess of RIs
-          # I'm going to look for an instance which can use this reservation
-          excess_instance.each do |instance_id|
-            if instances[instance_id][:type] != ri[:type] 
-              factor_instance = get_factor(instances[instance_id][:type])
-              factor_ri = get_factor(ri[:type])
-              recommendation = {rid: ri_id}
-              recommendation[:type] = instances[instance_id][:type]
-              recommendation[:az] = instances[instance_id][:az] if instances[instance_id][:az] != ri[:az]
-              recommendation[:vpc] = instances[instance_id][:vpc] if instances[instance_id][:vpc] != ri[:vpc]
-              if factor_ri > factor_instance
-                # Split the RI
-                new_instances = factor_ri / factor_instance
-                recommendation[:count] = new_instances.to_i
-                #Rails.logger.debug("Change in the RI #{ri_id}, split in #{new_instances} to type #{instances[instance_id][:type]}")
+    # Only for Linux instances
+    if platform == 'Linux'
+      reserved_instances.each do |ri_id, ri|
+        if !ri.nil? && ri[:type].split(".")[0] == family && ri[:az][0..-2] == region && ri[:platform] == platform && ri[:tenancy] == tenancy && ri[:status] == 'active'
+          # This reserved instance is of the usable type
+          if summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1] > summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][0]
+            # If for this reservation type we have excess of RIs
+            # I'm going to look for an instance which can use this reservation
+            excess_instance.each do |instance_id|
+              if instances[instance_id][:type] != ri[:type] 
+                factor_instance = get_factor(instances[instance_id][:type])
+                factor_ri = get_factor(ri[:type])
+                recommendation = {rid: ri_id}
+                recommendation[:type] = instances[instance_id][:type]
+                recommendation[:az] = instances[instance_id][:az] if instances[instance_id][:az] != ri[:az]
+                #recommendation[:vpc] = instances[instance_id][:vpc] if instances[instance_id][:vpc] != ri[:vpc]
+                if factor_ri > factor_instance
+                  # Split the RI
+                  new_instances = factor_ri / factor_instance
+                  recommendation[:count] = new_instances.to_i
+                  #Rails.logger.debug("Change in the RI #{ri_id}, split in #{new_instances} to type #{instances[instance_id][:type]}")
 
-                summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][1] -= 1
-                summary[instances[instance_id][:type]][instances[instance_id][:az]][ri[:platform]][instances[instance_id][:vpc]][ri[:tenancy]][1] += new_instances
-                reserved_instances[ri_id][:count] -= 1
-                reserved_instances[ri_id] = nil if reserved_instances[ri_id][:count] == 0
-                recommendations << recommendation
-                return true
-              else
-                ri_needed = factor_instance / factor_ri
-                if (summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][1]-ri_needed) >= summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][0]
-                  # If after the RI modification I'm going to have enough RIs
-                  #Rails.logger.debug("Change in the RI #{ri_id}, join in #{ri_needed} to type #{instances[instance_id][:type]}")
-                  recommendation[:count] = 1
-                  summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][1] -= ri_needed
-                  summary[instances[instance_id][:type]][instances[instance_id][:az]][ri[:platform]][instances[instance_id][:vpc]][ri[:tenancy]][1] += 1
-                  reserved_instances[ri_id][:count] -= ri_needed
+                  summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1] -= 1
+                  summary[instances[instance_id][:type]][instances[instance_id][:az]][ri[:platform]][ri[:tenancy]][1] += new_instances
+                  reserved_instances[ri_id][:count] -= 1
                   reserved_instances[ri_id] = nil if reserved_instances[ri_id][:count] == 0
                   recommendations << recommendation
                   return true
+                else
+                  # Join the RI
+                  ri_needed = factor_instance / factor_ri
+                  if (summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1]-ri_needed) >= summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][0]
+                    # If after the RI modification I'm going to have enough RIs
+                    #Rails.logger.debug("Change in the RI #{ri_id}, join in #{ri_needed} to type #{instances[instance_id][:type]}")
+                    recommendation[:count] = 1
+                    summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1] -= ri_needed
+                    summary[instances[instance_id][:type]][instances[instance_id][:az]][ri[:platform]][ri[:tenancy]][1] += 1
+                    reserved_instances[ri_id][:count] -= ri_needed
+                    reserved_instances[ri_id] = nil if reserved_instances[ri_id][:count] == 0
+                    recommendations << recommendation
+                    return true
+                  end
                 end
               end
             end
@@ -195,26 +195,26 @@ class SummaryController < ApplicationController
   end
 
   def calculate_excess(summary, excess)
+    # Group the excess of RIs and instances per family and region
+    # For example, for m3 in eu-west-1, it calculate the total RIs not used and the total instances not assigned to an RI (in any family type and AZ)
     summary.each do |type, elem1|
       elem1.each do |az, elem2| 
         elem2.each do |platform, elem3| 
-          elem3.each do |vpc, elem4| 
-            elem4.each do |tenancy, total|
-              if total[0] != total[1]
-                family = type.split(".")[0]
-                region = az[0..-2]
-                excess[family] = {} if excess[family].nil?
-                excess[family][region] = {} if excess[family][region].nil?
-                excess[family][region][platform] = {} if excess[family][region][platform].nil?
-                excess[family][region][platform][tenancy] = [0,0] if excess[family][region][platform][tenancy].nil?
-                factor = get_factor(type)
-                if total[0] > total[1]
-                  # [0] -> Total of instances without a reserved instance
-                  excess[family][region][platform][tenancy][0] += (total[0]-total[1])*factor
-                else
-                  # [1] -> Total of reserved instances not used
-                  excess[family][region][platform][tenancy][1] += (total[1]-total[0])*factor
-                end
+          elem3.each do |tenancy, total|
+            if total[0] != total[1]
+              family = type.split(".")[0]
+              region = az[0..-2]
+              excess[family] = {} if excess[family].nil?
+              excess[family][region] = {} if excess[family][region].nil?
+              excess[family][region][platform] = {} if excess[family][region][platform].nil?
+              excess[family][region][platform][tenancy] = [0,0] if excess[family][region][platform][tenancy].nil?
+              factor = get_factor(type)
+              if total[0] > total[1]
+                # [0] -> Total of instances without a reserved instance
+                excess[family][region][platform][tenancy][0] += (total[0]-total[1])*factor
+              else
+                # [1] -> Total of reserved instances not used
+                excess[family][region][platform][tenancy][1] += (total[1]-total[0])*factor
               end
             end
           end
@@ -256,9 +256,8 @@ class SummaryController < ApplicationController
       summary[instance[:type]] = {} if summary[instance[:type]].nil?
       summary[instance[:type]][instance[:az]] = {} if summary[instance[:type]][instance[:az]].nil?
       summary[instance[:type]][instance[:az]][instance[:platform]] = {} if summary[instance[:type]][instance[:az]][instance[:platform]].nil?
-      summary[instance[:type]][instance[:az]][instance[:platform]][instance[:vpc]] = {} if summary[instance[:type]][instance[:az]][instance[:platform]][instance[:vpc]].nil?
-      summary[instance[:type]][instance[:az]][instance[:platform]][instance[:vpc]][instance[:tenancy]] = [0,0] if summary[instance[:type]][instance[:az]][instance[:platform]][instance[:vpc]][instance[:tenancy]].nil?
-      summary[instance[:type]][instance[:az]][instance[:platform]][instance[:vpc]][instance[:tenancy]][0] += 1
+      summary[instance[:type]][instance[:az]][instance[:platform]][instance[:tenancy]] = [0,0] if summary[instance[:type]][instance[:az]][instance[:platform]][instance[:tenancy]].nil?
+      summary[instance[:type]][instance[:az]][instance[:platform]][instance[:tenancy]][0] += 1
     end
 
     reserved_instances.each do |ri_id, ri|
@@ -266,9 +265,8 @@ class SummaryController < ApplicationController
         summary[ri[:type]] = {} if summary[ri[:type]].nil?
         summary[ri[:type]][ri[:az]] = {} if summary[ri[:type]][ri[:az]].nil?
         summary[ri[:type]][ri[:az]][ri[:platform]] = {} if summary[ri[:type]][ri[:az]][ri[:platform]].nil?
-        summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]] = {} if summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]].nil?
-        summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]] = [0,0] if summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]].nil?
-        summary[ri[:type]][ri[:az]][ri[:platform]][ri[:vpc]][ri[:tenancy]][1] += ri[:count]
+        summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]] = [0,0] if summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]].nil?
+        summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1] += ri[:count]
       end
     end
 

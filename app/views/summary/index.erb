@@ -6,7 +6,6 @@
         <th>Instance type</th>
         <th>Availability Zone</th>
         <th>Platform</th>
-        <th>Network</th>
         <th>Tenancy</th>
         <th>Total Instances</th>
         <th>Total Reservations</th>
@@ -16,18 +15,15 @@
       <% @summary.each do |type, elem1| %>
         <% elem1.each do |az, elem2| %>
           <% elem2.each do |platform, elem3| %>
-            <% elem3.each do |vpc, elem4| %>
-              <% elem4.each do |tenancy, total| %>
-                <tr>
-                  <td><%= type %></td>
-                  <td><%= az %></td>
-                  <td><%= platform %></td>
-                  <td><%= vpc %></td>
-                  <td><%= tenancy %></td>
-                  <td><%= total[0] %></td>
-                  <td><%= total[1] %></td>
-                </tr>
-              <% end %>
+            <% elem3.each do |tenancy, total| %>
+              <tr>
+                <td><%= type %></td>
+                <td><%= az %></td>
+                <td><%= platform %></td>
+                <td><%= tenancy %></td>
+                <td><%= total[0] %></td>
+                <td><%= total[1] %></td>
+              </tr>
             <% end %>
           <% end %>
         <% end %>
@@ -59,8 +55,8 @@ $(function () {
     });
 
 function rowStyle(row, index) {
-  inst = parseInt(row[5]);
-  reserv = parseInt(row[6]);
+  inst = parseInt(row[4]);
+  reserv = parseInt(row[5]);
 
   if (inst > reserv) {
     return { classes: 'warning' };
