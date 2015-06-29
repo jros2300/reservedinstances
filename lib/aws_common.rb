@@ -142,7 +142,7 @@ module AwsCommon
                 elsif ri.product_description.include?("Windows") && !ri.product_description.include?("SQL Server")
                   instances[ri.reserved_instances_id][:platform] = 'Windows'
                 else
-                  instances[ri.reserved_instances_id] = nil
+                  instances.delete(ri.reserved_instances_id)
                 end
               end
             end
@@ -180,7 +180,7 @@ module AwsCommon
         elsif row[7].include?("Windows") && !row[7].include?("SQL Server")
           instances[row[1]][:platform] = 'Windows'
         else
-          instances[row[1]] = nil
+          instances.delete(row[1])
         end
       end
     end
