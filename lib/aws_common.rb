@@ -46,6 +46,14 @@ module AwsCommon
     return account_ids
   end
 
+  def is_marketplace(product_codes)
+    return false if product_codes.blank?
+    product_codes.each do |product_code|
+      return true if product_code.product_code_type == 'marketplace'
+    end
+    return false
+  end
+
   def get_instances(regions, account_ids)
     return get_mock_instances if !ENV['MOCK_DATA'].blank?
     Rails.cache.fetch("instances", expires_in: 20.minutes) do
@@ -61,7 +69,9 @@ module AwsCommon
             ec2 = Aws::EC2::Resource.new(client: Aws::EC2::Client.new(region: region, credentials: role_credentials))
           end
           ec2.instances.each do |instance|
-            instances[instance.id] = {type: instance.instance_type, az: instance.placement.availability_zone, tenancy: instance.placement.tenancy, platform: instance.platform.blank? ? "Linux" : "Windows", account_id: account_id[0], vpc: instance.vpc_id.blank? ? "EC2 Classic" : "VPC"} if instance.state.name == 'running'
+            if !is_marketplace(instance.product_codes)
+              instances[instance.id] = {type: instance.instance_type, az: instance.placement.availability_zone, tenancy: instance.placement.tenancy, platform: instance.platform.blank? ? "Linux" : "Windows", account_id: account_id[0], vpc: instance.vpc_id.blank? ? "EC2 Classic" : "VPC"} if instance.state.name == 'running'
+            end
           end
         end
       end
