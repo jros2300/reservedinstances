@@ -19,7 +19,7 @@
       <td></td>
       <td><%= i %></td>
       <% i += 1 %>
-      <td><%= recommendation[:rid] %></td>
+      <td><a href='reservedinstances?search=<%= recommendation[:rid] %>'><%= recommendation[:rid] %></a></td>
       <td><%= recommendation[:count] %></td>
       <td><%= recommendation[:type] %></td>
       <td><%= recommendation[:az] %></td>

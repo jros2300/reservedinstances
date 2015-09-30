@@ -1,6 +1,6 @@
 <h1>Summary</h1>
 
-<table class="table table-striped table-hover" id="data_table" data-pagination="true" data-search="true" data-row-style="rowStyle">
+<table class="table table-striped table-hover" id="data_table" data-pagination="true" data-search="true" data-row-style="rowStyle" <%= "data-search-text=" + params[:search] if !params[:search].blank?%>>
     <thead>
       <tr>
         <th>Instance type</th>
