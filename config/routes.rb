@@ -19,6 +19,7 @@ Rails.application.routes.draw do
   get '/health' => 'summary#health'
 
   post '/periodicworker' => 'summary#periodic_worker'
+  post '/s3importer' => 'summary#s3importer'
 
 
   # Example of regular route:

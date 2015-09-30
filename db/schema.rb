@@ -11,7 +11,12 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20150615090544) do
+ActiveRecord::Schema.define(version: 20150930131716) do
+
+  create_table "amis", force: :cascade do |t|
+    t.string "ami"
+    t.string "operation"
+  end
 
   create_table "recommendations", force: :cascade do |t|
     t.string   "rid"
@@ -32,6 +37,9 @@ ActiveRecord::Schema.define(version: 20150615090544) do
     t.integer  "minutes"
     t.datetime "nextrun"
     t.string   "password"
+    t.boolean  "importdbr"
+    t.string   "s3bucket"
+    t.datetime "processed"
   end
 
 end

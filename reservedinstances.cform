@@ -186,6 +186,8 @@
                 {"Namespace" : "aws:ec2:vpc", "OptionName" : "AssociatePublicIpAddress", "Value" : "true"},
                 {"Namespace" : "aws:autoscaling:asg", "OptionName" : "MinSize", "Value" : "1"},
                 {"Namespace" : "aws:autoscaling:asg", "OptionName" : "MaxSize", "Value" : "1"},
+                {"Namespace" : "aws:elasticbeanstalk:sqsd", "OptionName" : "InactivityTimeout", "Value" : "1800"},
+                {"Namespace" : "aws:elasticbeanstalk:sqsd", "OptionName" : "VisibilityTimeout", "Value" : "1850"},
                 {"Namespace" : "aws:elasticbeanstalk:sqsd", "OptionName" : "WorkerQueueURL", "Value" : {"Ref": "MyQueue"}},
                 {"Namespace" : "aws:elasticbeanstalk:environment", "OptionName" : "EnvironmentType", "Value" : "SingleInstance"},
                 {"Namespace" : "aws:elasticbeanstalk:application:environment", "OptionName" : "RDS_DB_NAME", "Value" : "ritooldb"},

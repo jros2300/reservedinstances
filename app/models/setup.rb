@@ -35,6 +35,57 @@ class Setup < ActiveRecord::Base
     setup.password = BCrypt::Password.create(password)
     setup.save
   end
+  
+  def self.get_importdbr
+    setup = Setup.first
+    importdbr = false
+    if !setup.nil? && !setup.importdbr.nil?
+      importdbr = setup.importdbr
+    end
+    return importdbr
+  end
+
+  def self.put_importdbr(importdbr)
+    setup = Setup.first
+    setup = Setup.new if setup.nil?
+
+    setup.importdbr = importdbr
+    setup.save
+  end
+
+  def self.get_s3bucket
+    setup = Setup.first
+    s3bucket = ''
+    if !setup.nil? && !setup.s3bucket.nil?
+      s3bucket = setup.s3bucket
+    end
+    return s3bucket
+  end
+
+  def self.put_s3bucket(s3bucket)
+    setup = Setup.first
+    setup = Setup.new if setup.nil?
+
+    setup.s3bucket = s3bucket
+    setup.save
+  end
+
+  def self.get_processed
+    setup = Setup.first
+    s3bucket = ''
+    if !setup.nil? && !setup.processed.nil?
+      processed = setup.processed
+    end
+    return processed
+  end
+
+  def self.put_processed(processed)
+    setup = Setup.first
+    setup = Setup.new if setup.nil?
+
+    setup.processed = processed
+    setup.save
+  end
 
   def self.test_password(password)
     return BCrypt::Password.new(get_password).is_password? password

@@ -5,6 +5,8 @@ class SetupController < ApplicationController
   def index
     @regions = Setup.get_regions
     @minutes = Setup.get_minutes
+    @importdbr = Setup.get_importdbr
+    @s3bucket = Setup.get_s3bucket
   end
 
   def change
@@ -13,6 +15,8 @@ class SetupController < ApplicationController
       Setup.put_minutes params[:minutes] if params[:minutes].to_i >= 30 || params[:minutes].to_i == 0 
     end
     Setup.put_password params[:password] if !params[:password].blank?
+    Setup.put_importdbr !params[:importdbr].blank?
+    Setup.put_s3bucket params[:s3bucket]
     Rails.cache.clear
     redirect_to action: 'index'
   end

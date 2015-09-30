@@ -1,7 +1,10 @@
 module AwsCommon
   require 'csv'
+  require 'zip'
 
   METADATA_ENDPOINT = 'http://169.254.169.254/latest/meta-data/'
+  PLATFORMS = {'RunInstances:000g' => 'SUSE Linux', 'RunInstances:0006' => 'Windows with SQL Server Standard', 'RunInstances:0202' => 'Windows with SQL Server Web', 'RunInstances:0010' => 'Red Hat Enterprise Linux', 'RunInstances:0102' => 'Windows with SQL Server Enterprise'}
+
   def get_regions
     return ['eu-west-1', 'us-east-1', 'us-west-1', 'us-west-2']
   end
@@ -60,6 +63,11 @@ module AwsCommon
       instances = {}
       current_account_id = get_current_account_id
 
+      amis = {}
+      Ami.all.each do |ami|
+        amis[ami.ami] = ami.operation
+      end
+
       account_ids.each do |account_id|
         regions.keep_if {|key, value| value }.keys.each do |region|
           if account_id[0] == current_account_id
@@ -70,7 +78,10 @@ module AwsCommon
           end
           ec2.instances.each do |instance|
             if !is_marketplace(instance.product_codes)
-              instances[instance.id] = {type: instance.instance_type, az: instance.placement.availability_zone, tenancy: instance.placement.tenancy, platform: instance.platform.blank? ? "Linux" : "Windows", account_id: account_id[0], vpc: instance.vpc_id.blank? ? "EC2 Classic" : "VPC"} if instance.state.name == 'running'
+              platform = instance.platform.blank? ? "Linux/UNIX" : "Windows"
+              platform = PLATFORMS[amis[instance.image_id]] if !amis[instance.image_id].nil? && !PLATFORMS[amis[instance.image_id]].nil?
+
+              instances[instance.id] = {type: instance.instance_type, az: instance.placement.availability_zone, tenancy: instance.placement.tenancy, platform: platform, account_id: account_id[0], vpc: instance.vpc_id.blank? ? "EC2 Classic" : "VPC", ami: instance.image_id} if instance.state.name == 'running'
             end
           end
         end
@@ -106,8 +117,16 @@ module AwsCommon
 
   def get_mock_instances
     instances = {}
+    amis = {}
+    Ami.all.each do |ami|
+      amis[ami.ami] = ami.operation
+    end
+    Rails.logger.debug amis
     CSV.foreach('/tmp/instances.csv', headers: true) do |row|
-      instances[row[1]] = {type: row[2], az: row[3], tenancy: row[4], platform: row[5].blank? ? "Linux" : "Windows", account_id: row[6], vpc: row[7].blank? ? "EC2 Classic" : "VPC"} if row[8] == 'running'
+      platform = row[5].blank? ? "Linux/UNIX" : "Windows"
+      platform = PLATFORMS[amis[row[9]]] if !amis[row[9]].nil? && !PLATFORMS[amis[row[9]]].nil?
+
+      instances[row[1]] = {type: row[2], az: row[3], tenancy: row[4], platform: platform, account_id: row[6], vpc: row[7].blank? ? "EC2 Classic" : "VPC", ami: row[9]} if row[8] == 'running'
     end
     return instances
   end
@@ -147,13 +166,7 @@ module AwsCommon
                 else
                   instances[ri.reserved_instances_id][:vpc] = 'VPC'
                 end
-                if ri.product_description.include? "Linux/UNIX"
-                  instances[ri.reserved_instances_id][:platform] = 'Linux'
-                elsif ri.product_description.include?("Windows") && !ri.product_description.include?("SQL Server")
-                  instances[ri.reserved_instances_id][:platform] = 'Windows'
-                else
-                  instances.delete(ri.reserved_instances_id)
-                end
+                instances[ri.reserved_instances_id][:platform] = ri.product_description.sub(' (Amazon VPC)','')
               end
             end
           end
@@ -185,13 +198,8 @@ module AwsCommon
         else
           instances[row[1]][:vpc] = 'VPC'
         end
-        if row[7].include? "Linux/UNIX"
-          instances[row[1]][:platform] = 'Linux'
-        elsif row[7].include?("Windows") && !row[7].include?("SQL Server")
-          instances[row[1]][:platform] = 'Windows'
-        else
-          instances.delete(row[1])
-        end
+
+        instances[row[1]][:platform] = row[7].sub(' (Amazon VPC)','')
       end
     end
     return instances
@@ -223,4 +231,92 @@ module AwsCommon
     log.timestamp = DateTime.now
     log.save
   end
+
+  def get_s3_resource_for_bucket(bucket)
+    s3 = Aws::S3::Client.new(region: 'us-east-1')
+    begin
+      location = s3.get_bucket_location({bucket: bucket})
+      s3 = Aws::S3::Client.new(region: location.location_constraint) if location.location_constraint != 'us-east-1'
+    rescue
+      return nil
+    end
+    return Aws::S3::Resource.new(client: s3)
+  end
+
+  def get_dbr_last_date(bucket, last_processed)
+    return 1 if !ENV['MOCK_DATA'].blank?
+    last_processed = Time.new(1000) if last_processed.blank?
+    s3 = get_s3_resource_for_bucket(bucket)
+    return nil if s3.nil?
+    bucket = s3.bucket(bucket)
+    last_modified = Time.new(1000)
+    last_object = nil
+    bucket.objects.each do |object|
+      if object.key.include? 'aws-billing-detailed-line-items-with-resources-and-tags'
+        if object.last_modified > last_modified && object.last_modified > last_processed
+          last_modified = object.last_modified
+          last_object = object
+        end
+      end
+    end
+    
+    return last_object
+  end
+
+  def download_to_temp(bucket, object)
+    file_path = File.join(Dir.tmpdir, Dir::Tmpname.make_tmpname('dbr',nil))
+
+    if !ENV['MOCK_DATA'].blank?
+      FileUtils.cp '/tmp/dbr.csv.zip', file_path
+      return file_path
+    end
+
+    s3 = get_s3_resource_for_bucket(bucket)
+    return nil if s3.nil?
+    object.get({response_target: file_path})
+    return file_path
+  end
+
+  def get_amis(list_instances, account_ids)
+    return get_mock_amis(list_instances) if !ENV['MOCK_DATA'].blank?
+    amis = {}
+    current_account_id = get_current_account_id
+    list_instances.each do |instance_id, values|
+      # values -> [Operation, AccountId, AZ]
+      account_id = nil
+      account_ids.each do |acc|
+        if acc[0] == values[1]
+          account_id = acc
+          break
+        end
+      end
+
+      if !account_id.nil?
+        region = values[2][0..-2]
+        if account_id[0] == current_account_id
+          ec2 = Aws::EC2::Resource.new(client: Aws::EC2::Client.new(region: region))
+        else
+          role_credentials = Aws::AssumeRoleCredentials.new( client: Aws::STS::Client.new(region: region), role_arn: account_id[1], role_session_name: "reserved_instances" )
+          ec2 = Aws::EC2::Resource.new(client: Aws::EC2::Client.new(region: region, credentials: role_credentials))
+        end
+        ec2.instances({instance_ids: [instance_id]}).each do |instance|
+          amis[instance.image_id] = values[0]
+        end
+      end
+    end
+    return amis
+  end
+
+  def get_mock_amis(list_instances)
+    amis = {}
+    instances = get_mock_instances
+    list_instances.each do |instance_id, values|
+      # values -> [Operation, AccountId, AZ]
+      if !instances[instance_id].nil? && !instances[instance_id][:ami].nil?
+        amis[instances[instance_id][:ami]] = values[0]
+      end
+    end
+    return amis
+  end
+
 end
