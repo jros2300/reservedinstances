@@ -7,6 +7,7 @@ class SetupController < ApplicationController
     @minutes = Setup.get_minutes
     @importdbr = Setup.get_importdbr
     @s3bucket = Setup.get_s3bucket
+    @processed = Setup.get_processed
   end
 
   def change

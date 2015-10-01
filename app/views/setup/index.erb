@@ -28,6 +28,9 @@
       <label>S3 Bucket with the DBR files</label>
       <%= text_field_tag "s3bucket", @s3bucket, id: 's3bucket', class: 'form-control' %>
     </div>
+    <div class="form-group">
+      <small>Last processed time: <%= @processed.blank? ? "Never" : @processed.to_s %></small>
+    </div>
     <%= submit_tag("Save", class: 'btn btn-default') %>
   <% end %>
 

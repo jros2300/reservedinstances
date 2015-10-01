@@ -2,7 +2,7 @@
 ## Introduction
 This tool is to manage your Reserved Instances in AWS across all you linked accounts. The tool reads your live configuration (instances and reserved instances) in all your accounts using the AWS API, and produce a set of recommendations to optimize your RI usage. The tool can apply the modifications in your RIs (changing the availability zone, instance type or network allocation) for you, and you can configure it to apply all the recommendations automatically every so often.
 
-> **Note:** This tool doesn't work for "Windows with SQL Starndard", "Windows with SQL Web", "Windows with SQL Enterprise", "RHEL" or "SLES" instances. Please prevent the usage of accounts with these instance types.
+> **Note:** Now it's supported the instance types "Windows with SQL Starndard", "Windows with SQL Web", "Windows with SQL Enterprise", "RHEL" and "SLES". If you're using any of these instance types you should configure the DBR file.
 
 ## Installation
 To install the tool, you should create the necessary roles to let the tool run the AWS API calls. Then you can launch the tool using AWS Beanstalk, I've created a CloudFormation file to facilitate the deployment of the tool.
@@ -38,7 +38,7 @@ For each account where you're not going to deploy the tool (so for all but accou
 }
 ```
 
-If you only have one account, or if you have multiple accounts in the account1, create a new role. Name the role "reservedisntances", select the option "Amazon EC2" in the "AWS Service Roles" list. Create the rol and then attach two policies to it, the previous and and this one:
+If you only have one account, or if you have multiple accounts in the account1, create a new role. Name the role "reservedinstances", select the option "Amazon EC2" in the "AWS Service Roles" list. Create the rol and then attach two policies to it, the previous and and this one:
 
 ```json
 {
@@ -140,6 +140,43 @@ You need also this application in S3, you can download the last version and uplo
 
 Then you should go to the console in the account1, and select the service CloudFormation. Create a new stack and upload the template, complete all the parameters and create the stack. Once the stack is created you can access the application using the URL you can find in the Output of the stack.
 
+## DBR
+
+If you have any instance of these types: "Windows with SQL Starndard", "Windows with SQL Web", "Windows with SQL Enterprise", "RHEL" and "SLES", please continue reading this section and configure the system to read your DBR files.
+
+In first place you should configure the DBR (Detailed Billing Record) file generation following this instructions: http://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/detailed-billing-reports.html#turnonreports (selecting at least the "Detailed billing report with resources and tags" option).
+
+Add a new policy to the account1 role "reservedinstances" changing the bucket name for the bucket configured to store the DBR:
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:Get*",
+                "s3:List*"
+            ],
+            "Resource": [
+                "arn:aws:s3:::<bucketname>/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:List*",
+                "s3:Get*"
+            ],
+            "Resource": [
+                "arn:aws:s3:::<bucketname>"
+            ]
+        }
+    ]
+}
+```
+
+Finally, you should configure the bucket name in the application in the Setup tab and select the checkbox to process the DBR.
 
 ## Usage
 You can access the tool using the URL you can find in the output of the Stack. You should use the default password you put in the parameters of the Stack (you can left the username blank).

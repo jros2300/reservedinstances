@@ -246,6 +246,7 @@ module AwsCommon
     return 1 if !ENV['MOCK_DATA'].blank?
     last_processed = Time.new(1000) if last_processed.blank?
     s3 = get_s3_resource_for_bucket(bucket)
+    Rails.logger.debug "Error" if s3.nil?
     return nil if s3.nil?
     bucket = s3.bucket(bucket)
     last_modified = Time.new(1000)
