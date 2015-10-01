@@ -121,7 +121,6 @@ module AwsCommon
     Ami.all.each do |ami|
       amis[ami.ami] = ami.operation
     end
-    Rails.logger.debug amis
     CSV.foreach('/tmp/instances.csv', headers: true) do |row|
       platform = row[5].blank? ? "Linux/UNIX" : "Windows"
       platform = PLATFORMS[amis[row[9]]] if !amis[row[9]].nil? && !PLATFORMS[amis[row[9]]].nil?

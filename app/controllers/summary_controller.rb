@@ -74,16 +74,25 @@ class SummaryController < ApplicationController
             #content = entry.get_input_stream.read
           end
         end
+        f = File.open(file_path_unzip)
+        headers = f.gets
+        f.close
+        regular_account = true
+        regular_account = false if headers.include? "BlendedRate"
         file_path_unzip_grep = File.join(Dir.tmpdir, Dir::Tmpname.make_tmpname('dbrug',nil))
         system('grep "RunInstances:" ' + file_path_unzip + ' > ' + file_path_unzip_grep)
         list_instances = {}
         CSV.foreach(file_path_unzip_grep, {headers: true}) do |row|
           # row[10] -> Operation
-          # row[21] -> ResourceId
+          # row[21] -> ResourceId (19 for regular accounts)
           # row[2]  -> AccountId
           # row[11] -> AZ
           if !row[10].nil? && row[10].start_with?('RunInstances:') && row[10] != 'RunInstances:0002'
-            list_instances[row[21]] = [row[10], row[2], row[11]]
+            if regular_account
+              list_instances[row[19]] = [row[10], row[2], row[11]]
+            else
+              list_instances[row[21]] = [row[10], row[2], row[11]]
+            end
           end
         end
         amis = get_amis(list_instances, get_account_ids)
