@@ -2,7 +2,7 @@
 ## Introduction
 This tool is to manage your Reserved Instances in AWS across all you linked accounts. The tool reads your live configuration (instances and reserved instances) in all your accounts using the AWS API, and produce a set of recommendations to optimize your RI usage. The tool can apply the modifications in your RIs (changing the availability zone, instance type or network allocation) for you, and you can configure it to apply all the recommendations automatically every so often.
 
-> **Note:** Now it's supported the instance types "Windows with SQL Starndard", "Windows with SQL Web", "Windows with SQL Enterprise", "RHEL" and "SLES". If you're using any of these instance types you should configure the DBR file.
+> **Note:** Now the tool supports the instance types "Windows with SQL Standard", "Windows with SQL Web", "Windows with SQL Enterprise", "RHEL" and "SLES". If you're using any of these instance types you should configure the DBR file.
 
 ## Installation
 To install the tool, you should create the necessary roles to let the tool run the AWS API calls. Then you can launch the tool using AWS Beanstalk, I've created a CloudFormation file to facilitate the deployment of the tool.
@@ -142,7 +142,7 @@ Then you should go to the console in the account1, and select the service CloudF
 
 ## DBR
 
-If you have any instance of these types: "Windows with SQL Starndard", "Windows with SQL Web", "Windows with SQL Enterprise", "RHEL" and "SLES", please continue reading this section and configure the system to read your DBR files.
+If you have any instance of these types: "Windows with SQL Standard", "Windows with SQL Web", "Windows with SQL Enterprise", "RHEL" and "SLES", please continue reading this section and configure the system to read your DBR files.
 
 In first place you should configure the DBR (Detailed Billing Record) file generation following this instructions: http://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/detailed-billing-reports.html#turnonreports (selecting at least the "Detailed billing report with resources and tags" option).
 
@@ -177,6 +177,8 @@ Add a new policy to the account1 role "reservedinstances" changing the bucket na
 ```
 
 Finally, you should configure the bucket name in the application in the Setup tab and select the checkbox to process the DBR.
+
+Wait two hours after the action to let the system process the first DBR file.
 
 ## Usage
 You can access the tool using the URL you can find in the output of the Stack. You should use the default password you put in the parameters of the Stack (you can left the username blank).
