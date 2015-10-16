@@ -357,6 +357,11 @@
                     },
                     {
                         "Namespace": "aws:autoscaling:launchconfiguration",
+                        "OptionName": "RootVolumeSize",
+                        "Value": 100
+                    },
+                    {
+                        "Namespace": "aws:autoscaling:launchconfiguration",
                         "OptionName": "InstanceType",
                         "Value": {
                             "Ref": "WorkerInstanceType"

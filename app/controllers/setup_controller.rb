@@ -11,7 +11,9 @@ class SetupController < ApplicationController
   end
 
   def change
-    Setup.put_regions params[:regions]
+    if !params[:regions].blank?
+      Setup.put_regions params[:regions]
+    end
     if !params[:minutes].blank?
       Setup.put_minutes params[:minutes] if params[:minutes].to_i >= 30 || params[:minutes].to_i == 0 
     end
