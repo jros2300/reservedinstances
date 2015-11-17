@@ -1,8 +1,8 @@
 version: 1
 cron:
-  - name: "apply-recommendations-job"          
-    url: "/periodicworker"              
-    schedule: "*/5 * * * *"    
-  - name: "read-s3-dbr"          
-    url: "/s3importer"              
-    schedule: "* */2 * * *"    
+  - name: "apply-recommendations-job"
+    url: "/periodicworker"
+    schedule: "*/5 * * * *"
+  - name: "read-s3-dbr"
+    url: "/s3importer"
+    schedule: "* */2 * * *"
