@@ -214,12 +214,25 @@ module AwsCommon
         ec2 = Aws::EC2::Client.new(region: region, credentials: role_credentials)
       end
     end
+
     conf = {}
     conf[:availability_zone] = recommendation[:az].nil? ? ri[:az] : recommendation[:az] 
     conf[:platform] = recommendation[:vpc].nil? ? (ri[:vpc] == 'VPC' ? 'EC2-VPC' : 'EC2-Classic') : (recommendation[:vpc] == 'VPC' ? 'EC2-VPC' : 'EC2-Classic')
     conf[:instance_count] = recommendation[:count] 
     conf[:instance_type] = recommendation[:type].nil? ? ri[:type] : recommendation[:type] 
-    ec2.modify_reserved_instances(reserved_instances_ids:[recommendation[:rid]], target_configurations: [conf]) if ENV['MOCK_DATA'].blank?
+    all_confs = [conf]
+
+    #TODO Fill in the request with all the instances not modified in the RI
+    if ri[:count] > recommendation[:count] 
+      rest_conf = {}
+      rest_conf[:availability_zone] = ri[:az]
+      rest_conf[:platform] = ri[:vpc] == 'VPC' ? 'EC2-VPC' : 'EC2-Classic'
+      rest_conf[:instance_count] = ri[:count] - recommendation[:count] 
+      rest_conf[:instance_type] = ri[:type]
+      all_confs << rest_conf
+    end
+    
+    ec2.modify_reserved_instances(reserved_instances_ids:[recommendation[:rid]], target_configurations: all_confs) if ENV['MOCK_DATA'].blank?
     log = Recommendation.new
     log.accountid = ri[:account_id]
     log.rid = recommendation[:rid]
