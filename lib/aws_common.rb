@@ -222,12 +222,11 @@ module AwsCommon
     conf[:instance_type] = recommendation[:type].nil? ? ri[:type] : recommendation[:type] 
     all_confs = [conf]
 
-    #TODO Fill in the request with all the instances not modified in the RI
-    if ri[:count] > recommendation[:count] 
+    if ri[:count]*get_factor(ri[:type]) > conf[:instance_count]*get_factor(conf[:instance_type]) 
       rest_conf = {}
       rest_conf[:availability_zone] = ri[:az]
       rest_conf[:platform] = ri[:vpc] == 'VPC' ? 'EC2-VPC' : 'EC2-Classic'
-      rest_conf[:instance_count] = ri[:count] - recommendation[:count] 
+      rest_conf[:instance_count] = ri[:count] - conf[:count]*get_factor(conf[:instance_type])
       rest_conf[:instance_type] = ri[:type]
       all_confs << rest_conf
     end
@@ -330,6 +329,34 @@ module AwsCommon
       end
     end
     return amis
+  end
+
+  def get_factor(type)
+    size = type.split(".")[1]
+    return case size
+      when "nano"
+        0.25
+      when "micro"
+        0.5
+      when "small"
+        1
+      when "medium"
+        2
+      when "large"
+        4
+      when "xlarge"
+        8
+      when "2xlarge"
+        16
+      when "4xlarge"
+        32
+      when "8xlarge"
+        64
+      when "10xlarge"
+        80
+      else
+        0
+    end
   end
 
 end

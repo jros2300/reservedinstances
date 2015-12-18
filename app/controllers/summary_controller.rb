@@ -236,6 +236,10 @@ class SummaryController < ApplicationController
                     recommendations << recommendation
                     return true
                   end
+                  if (get_total_compatible_ri_factor(ri, reserved_instances, summary) > factor_instance)
+                    #TODO I can join multiple RIs to cover the instance
+                    #list_ris = get_combination_ris(get_list_possible_ris(ri, reserved_instances, summary), factor_instance)
+                  end
                 end
               end
             end
@@ -246,6 +250,51 @@ class SummaryController < ApplicationController
 
     return false
 
+  end
+
+  def get_total_compatible_ri_factor(ri, reserved_instances, summary)
+    # Return the total execess of ri with the same end date, compatible to join
+    total_number = 0
+    reserved_instances.each do |ri2_id, ri2|
+      if !ri2.nil? && ri[:type].split(".")[0] == ri2[:type].split(".")[0] && ri[:az][0..-2] == ri2[:az][0..-2] && ri[:platform] == ri2[:platform] && ri[:tenancy] == ri2[:tenancy] && ri2[:status] == 'active' && ri[:end] == ri2[:end]
+        # This reserved instance is of the same type
+        if summary[ri2[:type]][ri2[:az]][ri2[:platform]][ri2[:tenancy]][1] > summary[ri2[:type]][ri2[:az]][ri2[:platform]][ri2[:tenancy]][0]
+          # If for this reservation type we have excess of RIs
+          total_number += get_factor(ri2[:type]) * (summary[ri2[:type]][ri2[:az]][ri2[:platform]][ri2[:tenancy]][1] - summary[ri2[:type]][ri2[:az]][ri2[:platform]][ri2[:tenancy]][0])
+        end
+      end
+    end
+    return total_number
+  end
+
+  def get_combination_ris(list_ris, value_expected)
+    list_ris.each_index do |i|
+      ri = list_ris[i]
+      ri_factor = get_factor(ri[:type])
+      return [ri] if value_expected == ri_factor
+      if value_expected > ri_factor
+        new_list = Array.new(list_ris)
+        new_list = list_ris.delete_at(i)
+        new_combination = get_combination_ris(new_list, value_expected-ri_factor)
+        return new_combination << ri if !new_combination.nil?
+      end
+    end
+    return nil
+  end
+
+  def get_list_possible_ris(ri, reserved_instances, summary)
+    # Return the list of ri with the same end date, compatible to join
+    possible_ris = []
+    reserved_instances.each do |ri2_id, ri2|
+      if !ri2.nil? && ri[:type].split(".")[0] == ri2[:type].split(".")[0] && ri[:az][0..-2] == ri2[:az][0..-2] && ri[:platform] == ri2[:platform] && ri[:tenancy] == ri2[:tenancy] && ri2[:status] == 'active' && ri[:end] == ri2[:end]
+        # This reserved instance is of the same type
+        if summary[ri2[:type]][ri2[:az]][ri2[:platform]][ri2[:tenancy]][1] > summary[ri2[:type]][ri2[:az]][ri2[:platform]][ri2[:tenancy]][0]
+          # If for this reservation type we have excess of RIs
+          possible_ris << ri2
+        end
+      end
+    end
+    return possible_ris
   end
 
   def calculate_excess(summary, excess)
@@ -274,32 +323,6 @@ class SummaryController < ApplicationController
           end
         end
       end
-    end
-  end
-
-  def get_factor(type)
-    size = type.split(".")[1]
-    return case size
-    when "micro"
-      0.5
-    when "small"
-      1
-    when "medium"
-      2
-    when "large"
-      4
-    when "xlarge"
-      8
-    when "2xlarge"
-      16
-    when "4xlarge"
-      32
-    when "8xlarge"
-      64
-    when "10xlarge"
-      80
-    else
-      0
     end
   end
 
