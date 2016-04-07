@@ -183,7 +183,7 @@
                     "Ref": "RIApplication"
                 },
                 "Description": "Reserved Instances Tool Application Web Server",
-                "SolutionStackName": "64bit Amazon Linux 2015.09 v2.0.4 running Ruby 2.2 (Passenger Standalone)",
+                "SolutionStackName": "64bit Amazon Linux 2015.09 v2.0.8 running Ruby 2.2 (Passenger Standalone)",
                 "VersionLabel": {
                     "Ref": "RIApplicationVersion"
                 },
@@ -331,7 +331,7 @@
                     "Ref": "RIApplication"
                 },
                 "Description": "Reserved Instances Tool Worker to apply the recommendations automatically",
-                "SolutionStackName": "64bit Amazon Linux 2015.09 v2.0.4 running Ruby 2.2 (Passenger Standalone)",
+                "SolutionStackName": "64bit Amazon Linux 2015.09 v2.0.8 running Ruby 2.2 (Passenger Standalone)",
                 "VersionLabel": {
                     "Ref": "RIApplicationVersion"
                 },
