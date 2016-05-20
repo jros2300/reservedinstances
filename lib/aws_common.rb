@@ -5,10 +5,6 @@ module AwsCommon
   METADATA_ENDPOINT = 'http://169.254.169.254/latest/meta-data/'
   PLATFORMS = {'RunInstances:000g' => 'SUSE Linux', 'RunInstances:0006' => 'Windows with SQL Server Standard', 'RunInstances:0202' => 'Windows with SQL Server Web', 'RunInstances:0010' => 'Red Hat Enterprise Linux', 'RunInstances:0102' => 'Windows with SQL Server Enterprise'}
 
-  def get_regions
-    return ['eu-west-1', 'us-east-1', 'us-west-1', 'us-west-2']
-  end
-
   def get_current_account_id
     Rails.cache.fetch("current_account_id", expires_in: 24.hours) do
       iam_data = Net::HTTP.get( URI.parse( METADATA_ENDPOINT + 'iam/info' ) )

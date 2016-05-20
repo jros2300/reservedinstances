@@ -81,6 +81,11 @@
                 "m4.xlarge"
             ],
             "Description": "Increase the instance type for the worker if you have a big DBR file and you're going to use it."
+        },
+        "BeanstalkStackName": {
+            "Description": "Name of the beankstalk Stack (Ruby 2.2 with Passenger): http://docs.aws.amazon.com/elasticbeanstalk/latest/dg/concepts.platforms.html#concepts.platforms.ruby",
+            "Type": "String",
+            "Default": "64bit Amazon Linux 2016.03 v2.1.2 running Ruby 2.2 (Passenger Standalone)"
         }
     },
     "Resources": {
@@ -183,7 +188,7 @@
                     "Ref": "RIApplication"
                 },
                 "Description": "Reserved Instances Tool Application Web Server",
-                "SolutionStackName": "64bit Amazon Linux 2015.09 v2.0.4 running Ruby 2.2 (Passenger Standalone)",
+                "SolutionStackName": { "Ref": "BeanstalkStackName" },
                 "VersionLabel": {
                     "Ref": "RIApplicationVersion"
                 },
@@ -331,14 +336,14 @@
                     "Ref": "RIApplication"
                 },
                 "Description": "Reserved Instances Tool Worker to apply the recommendations automatically",
-                "SolutionStackName": "64bit Amazon Linux 2015.09 v2.0.4 running Ruby 2.2 (Passenger Standalone)",
+                "SolutionStackName": { "Ref": "BeanstalkStackName" },
                 "VersionLabel": {
                     "Ref": "RIApplicationVersion"
                 },
                 "Tier": {
                     "Type": "SQS/HTTP",
                     "Name": "Worker",
-                    "Version": "2.0"
+                    "Version": " "
                 },
                 "OptionSettings": [
                     {
@@ -492,3 +497,4 @@
         }
     }
 }
+
