@@ -1,0 +1,19 @@
+# Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  accountid: 1
+  instanceid: MyString
+  instancetype: MyString
+  az: MyString
+  tenancy: MyString
+  platform: MyString
+  network: MyString
+
+two:
+  accountid: 1
+  instanceid: MyString
+  instancetype: MyString
+  az: MyString
+  tenancy: MyString
+  platform: MyString
+  network: MyString

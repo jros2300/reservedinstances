@@ -6,24 +6,39 @@
       <th data-field="state" data-checkbox="true"></th>
       <th>Change number</th>
       <th>Reservation ID</th>
-      <th>Count</th>
+      <th>Orig Count</th>
+      <th>New Count</th>
       <th>New type</th>
       <th>New availability zone</th>
-      <th>New network</th>
     </tr>
   </thead>
   <tbody>
   <% i= 0 %>
   <% @recommendations.each do |recommendation| %>
+    <% recommendation_ids = []
+      recommendation_counts = []
+      recommendation_orig_counts = []
+      recommendation_types = []
+      recommendation_azs = []
+      recommendation_vpcs = []
+      recommendation.each do |element|
+        recommendation_ids << "<a href='reservedinstances?search=#{element[:rid]}'>#{element[:rid]}</a>"
+        recommendation_counts << element[:count]
+        recommendation_orig_counts << element[:orig_count]
+        recommendation_types << element[:type]
+        recommendation_azs << element[:az]
+        recommendation_vpcs << element[:vpc]
+      end %>
+      
     <tr>
       <td></td>
       <td><%= i %></td>
       <% i += 1 %>
-      <td><a href='reservedinstances?search=<%= recommendation[:rid] %>'><%= recommendation[:rid] %></a></td>
-      <td><%= recommendation[:count] %></td>
-      <td><%= recommendation[:type] %></td>
-      <td><%= recommendation[:az] %></td>
-      <td><%= recommendation[:vpc] %></td>
+      <td><%= recommendation_ids.join(",").html_safe() %></td>
+      <td><%= recommendation_orig_counts.join(",") %></td>
+      <td><%= recommendation_counts.join(",") %></td>
+      <td><%= recommendation_types.join(",") %></td>
+      <td><%= recommendation_azs.join(",") %></td>
     </tr>
   <% end %>
   </tbody>

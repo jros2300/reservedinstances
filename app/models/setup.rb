@@ -35,6 +35,23 @@ class Setup < ActiveRecord::Base
     setup.password = BCrypt::Password.create(password)
     setup.save
   end
+
+  def self.get_affinity
+    setup = Setup.first
+    affinity = false
+    if !setup.nil? && !setup.affinity.nil?
+      affinity = setup.affinity
+    end
+    return affinity
+  end
+
+  def self.put_affinity(affinity)
+    setup = Setup.first
+    setup = Setup.new if setup.nil?
+
+    setup.affinity = affinity
+    setup.save
+  end
   
   def self.get_importdbr
     setup = Setup.first
@@ -108,6 +125,7 @@ class Setup < ActiveRecord::Base
     after_next = false
     setup = Setup.first
     if !setup.nil? && !setup.nextrun.nil?
+      return false if setup.minutes.nil? || setup.minutes==0
       after_next = (setup.nextrun < Time.current)
     end
     return after_next

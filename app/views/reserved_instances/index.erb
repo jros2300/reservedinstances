@@ -16,18 +16,18 @@
     </tr>
   </thead>
   <tbody>
-    <% @reserved_instances.each do |ri_id, ri| %>
+    <% @reserved_instances.each do |ri| %>
       <tr>
-        <td><%= ri[:account_id] %></td>
-        <td><%= ri_id %></td>
-        <td><%= ri[:type] %></td>
-        <td><%= ri[:az] %></td>
-        <td><%= ri[:tenancy] %></td>
-        <td><%= ri[:platform] %></td>
-        <td><%= ri[:vpc] %></td>
-        <td><%= ri[:count] %></td>
-        <td><%= ri[:end] %></td>
-        <td><%= ri[:status] %></td>
+        <td><%= ri.accountid %></td>
+        <td><%= ri.reservationid %></td>
+        <td><%= ri.instancetype %></td>
+        <td><%= ri.az %></td>
+        <td><%= ri.tenancy %></td>
+        <td><%= ri.platform %></td>
+        <td><%= ri.network %></td>
+        <td><%= ri.count %></td>
+        <td><%= ri.enddate %></td>
+        <td><%= ri.status %></td>
       </tr>
     <% end %>
   </tbody>

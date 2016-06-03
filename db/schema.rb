@@ -11,11 +11,30 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20150930131716) do
+ActiveRecord::Schema.define(version: 20160601145048) do
 
   create_table "amis", force: :cascade do |t|
     t.string "ami"
     t.string "operation"
+  end
+
+  create_table "instances", force: :cascade do |t|
+    t.string   "accountid"
+    t.string   "instanceid"
+    t.string   "instancetype"
+    t.string   "az"
+    t.string   "tenancy"
+    t.string   "platform"
+    t.string   "network"
+    t.datetime "created_at",   null: false
+    t.datetime "updated_at",   null: false
+  end
+
+  create_table "modifications", force: :cascade do |t|
+    t.string   "modificationid"
+    t.string   "status"
+    t.datetime "created_at",     null: false
+    t.datetime "updated_at",     null: false
   end
 
   create_table "recommendations", force: :cascade do |t|
@@ -28,6 +47,25 @@ ActiveRecord::Schema.define(version: 20150930131716) do
     t.string   "accountid"
     t.datetime "created_at",   null: false
     t.datetime "updated_at",   null: false
+    t.string   "counts"
+  end
+
+  create_table "reserved_instances", force: :cascade do |t|
+    t.string   "accountid"
+    t.string   "reservationid"
+    t.string   "instancetype"
+    t.string   "az"
+    t.string   "tenancy"
+    t.string   "platform"
+    t.string   "network"
+    t.integer  "count"
+    t.datetime "enddate"
+    t.string   "status"
+    t.string   "rolearn"
+    t.datetime "created_at",    null: false
+    t.datetime "updated_at",    null: false
+    t.string   "offering"
+    t.integer  "duration"
   end
 
   create_table "setups", force: :cascade do |t|
@@ -40,6 +78,7 @@ ActiveRecord::Schema.define(version: 20150930131716) do
     t.boolean  "importdbr"
     t.string   "s3bucket"
     t.datetime "processed"
+    t.boolean  "affinity"
   end
 
 end

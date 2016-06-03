@@ -20,6 +20,7 @@ Rails.application.routes.draw do
 
   post '/periodicworker' => 'summary#periodic_worker'
   post '/s3importer' => 'summary#s3importer'
+  post '/populatedb' => 'summary#populatedb'
 
 
   # Example of regular route:

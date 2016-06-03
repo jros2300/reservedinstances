@@ -16,11 +16,11 @@
       <tr>
         <td><%= recommendation.accountid %></td>
         <td><%= recommendation.rid %></td>
-        <td><%= recommendation.count %></td>
+        <td><%= recommendation.counts %></td>
         <td><%= recommendation.instancetype %></td>
         <td><%= recommendation.az %></td>
         <td><%= recommendation.timestamp %></td>
-        <td><%= @failed_recommendations.include?(recommendation.rid) ? '<span class="glyphicon glyphicon-remove" style="color:red"></span>'.html_safe : '<span class="glyphicon glyphicon-ok" style="color:green"></span>'.html_safe %></td>
+        <td><%= @failed_recommendations.find_by(modificationid: recommendation.rid) ? '<span class="glyphicon glyphicon-remove" style="color:red"></span>'.html_safe : '<span class="glyphicon glyphicon-ok" style="color:green"></span>'.html_safe %></td>
       </tr>
     <% end %>
   </tbody>

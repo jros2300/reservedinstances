@@ -189,6 +189,8 @@ Once in the tool you should configure it:
 * Automatically apply recommendations each: If you set this to 0, then there is not going to be any automatic mofification of the RIs. If you set this to any other number (more than 30), the application is going to apply all the recommendations automatically periodically on that interval.
 * Change Password: You can introduce a new password for the tool
 
+The tool updates the information from the accounts using the API calls each 5 minutes (it can take up to 5 minutes until you're able to see the first analysis when you deploy the application).
+
 In the tool there are several options:
 
 * Instances: You can see all your running instances in all the accounts, you can search by any field
@@ -196,7 +198,6 @@ In the tool there are several options:
 * Summary: You can see a summary of your instances and reserved instances. You can see where you have more instances than reserved instances (yellow), and where you have more RIs than instances (red)
 * Recommendations: You can see all the recommended modifications in your RIs, you can select all the modifications or a subset of them and apply the modifications to your RIs from the tool
 * Log: You'll see all the recommended modifications to your RIs applied by the tool, in the Recommendations option, or automatically by the periodic task
-* Clear Cache: The tool create a cache of 20 minutes of all the API calls, if you want to get the latest data then you can clear the cache and then select any other option
 
 
 

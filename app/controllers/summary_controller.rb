@@ -1,12 +1,12 @@
 class SummaryController < ApplicationController
-  skip_before_filter :verify_authenticity_token, :only => [:periodic_worker, :health, :s3importer]
-  skip_before_filter :authenticate, :only => [:periodic_worker, :health, :s3importer]
-  before_filter :authenticate_local, :only => [:periodic_worker, :s3importer]
+  skip_before_filter :verify_authenticity_token, :only => [:periodic_worker, :health, :s3importer, :populatedb]
+  skip_before_filter :authenticate, :only => [:periodic_worker, :health, :s3importer, :populatedb]
+  before_filter :authenticate_local, :only => [:periodic_worker, :s3importer, :populatedb]
 
   include AwsCommon
   def index
-    instances = get_instances(Setup.get_regions, get_account_ids)
-    reserved_instances = get_reserved_instances(Setup.get_regions, get_account_ids)
+    instances = Instance.all
+    reserved_instances = ReservedInstance.all
     @summary = get_summary(instances,reserved_instances)
   end
 
@@ -15,9 +15,19 @@ class SummaryController < ApplicationController
   end
 
   def recommendations
-    instances = get_instances(Setup.get_regions, get_account_ids)
-    reserved_instances = get_reserved_instances(Setup.get_regions, get_account_ids)
-    summary = get_summary(instances,reserved_instances)
+    instances2 = Instance.all
+    reserved_instances2 = ReservedInstance.all
+    summary = get_summary(instances2,reserved_instances2)
+
+    instances = {}
+    instances2.each do |instance|
+      instances[instance.instanceid] = {:account_id => instance.accountid, :type => instance.instancetype, :az => instance.az, :platform => instance.platform, :tenancy => instance.tenancy, :vpc => instance.network}
+    end
+
+    reserved_instances = {}
+    reserved_instances2.each do |ri|
+      reserved_instances[ri.reservationid] = {:account_id => ri.accountid, :type => ri.instancetype, :az => ri.az, :tenancy => ri.tenancy, :platform => ri.platform, :vpc => ri.network, :count => ri.count, :end => ri.enddate, :status => ri.status, :offering => ri.offering, :duration => ri.duration}
+    end
 
     continue_iteration = true
     @recommendations = []
@@ -27,36 +37,25 @@ class SummaryController < ApplicationController
       calculate_excess(summary, excess)
       continue_iteration = iterate_recommendation(excess, instances, summary, reserved_instances, @recommendations)
     end
-    #@recommendations = consolidate_recommendations(@recommendations)
   end
 
   def apply_recommendations
     recommendations = JSON.parse(params[:recommendations_original], :symbolize_names => true)
-    reserved_instances = get_reserved_instances(Setup.get_regions, get_account_ids)
     selected = params[:recommendations].split(",")
     selected_recommendations = []
     selected.each do |index|
       selected_recommendations << recommendations[index.to_i]
     end
-    selected_recommendations = consolidate_recommendations(selected_recommendations)
-    selected_recommendations.each do |recommendation|
-      ri = reserved_instances[recommendation[:rid]]
-      apply_recommendation(ri, recommendation)
-    end
+    apply_recommendation(selected_recommendations)
   end
 
   def periodic_worker
+    populatedb_data()
+
     if Setup.now_after_next
       Setup.update_next
-      Rails.cache.clear
       recommendations
-      Rails.cache.clear
-      reserved_instances = get_reserved_instances(Setup.get_regions, get_account_ids)
-      @recommendations = consolidate_recommendations(@recommendations)
-      @recommendations.each do |recommendation|
-        ri = reserved_instances[recommendation[:rid]]
-        apply_recommendation(ri, recommendation)
-      end
+      apply_recommendation(@recommendations)
     end
     render :nothing => true, :status => 200, :content_type => 'text/html'
   end
@@ -117,25 +116,16 @@ class SummaryController < ApplicationController
 
   def log_recommendations
     @recommendations = Recommendation.all
-    @failed_recommendations = get_failed_modifications(Setup.get_regions, get_account_ids)
+    @failed_recommendations = Modification.all
+  end
+
+  def populatedb
+    populatedb_data()
+
+    render :nothing => true, :status => 200, :content_type => 'text/html'
   end
 
   private
-
-  def consolidate_recommendations(recommendations)
-    new_recommendations = []
-    recommendations.each do |recommendation|
-      added = false
-      new_recommendations.each do |new_recommendation|
-        if new_recommendation[:rid]==recommendation[:rid] && new_recommendation[:az]==recommendation[:az] && new_recommendation[:type]==recommendation[:type] && new_recommendation[:vpc]==recommendation[:vpc] 
-          new_recommendation[:count] += recommendation[:count]
-          added = true
-        end
-      end
-      new_recommendations << {rid: recommendation[:rid], count: recommendation[:count], az: recommendation[:az], type: recommendation[:type], vpc: recommendation[:vpc]} if !added
-    end
-    return new_recommendations
-  end
 
   def iterate_recommendation(excess, instances, summary, reserved_instances, recommendations)
     excess.each do |family, elem1|
@@ -144,7 +134,10 @@ class SummaryController < ApplicationController
           elem3.each do |tenancy, total|
             if total[1] > 0 && total[0] > 0
               # There are reserved instances not used and instances on-demand
-              return true if calculate_recommendation(instances, family, region, platform, tenancy, summary, reserved_instances, recommendations)
+              if Setup.get_affinity
+                return true if calculate_recommendation(instances, family, region, platform, tenancy, summary, reserved_instances, recommendations, true)
+              end
+              return true if calculate_recommendation(instances, family, region, platform, tenancy, summary, reserved_instances, recommendations, false)
             end
           end
         end
@@ -153,7 +146,7 @@ class SummaryController < ApplicationController
     return false
   end
 
-  def calculate_recommendation(instances, family, region, platform, tenancy, summary, reserved_instances, recommendations)
+  def calculate_recommendation(instances, family, region, platform, tenancy, summary, reserved_instances, recommendations, affinity)
     excess_instance = []
 
     instances.each do |instance_id, instance|
@@ -175,8 +168,8 @@ class SummaryController < ApplicationController
           # I'm going to look for an instance which can use this reservation
           excess_instance.each do |instance_id|
             # Change with the same type
-            if instances[instance_id][:type] == ri[:type] 
-              recommendation = {rid: ri_id, count: 1}
+            if instances[instance_id][:type] == ri[:type] && (!affinity || instances[instance_id][:account_id] == ri[:account_id])
+              recommendation = {rid: ri_id, count: 1, orig_count: 1}
               if instances[instance_id][:az] != ri[:az]
                 recommendation[:az] = instances[instance_id][:az]
                 #Rails.logger.debug("Change in the RI #{ri_id}, to az #{instances[instance_id][:az]}")
@@ -185,7 +178,7 @@ class SummaryController < ApplicationController
               summary[ri[:type]][instances[instance_id][:az]][ri[:platform]][ri[:tenancy]][1] += 1
               reserved_instances[ri_id][:count] -= 1
               reserved_instances[ri_id] = nil if reserved_instances[ri_id][:count] == 0
-              recommendations << recommendation
+              recommendations << [recommendation]
               return true
             end
           end
@@ -203,7 +196,7 @@ class SummaryController < ApplicationController
             # If for this reservation type we have excess of RIs
             # I'm going to look for an instance which can use this reservation
             excess_instance.each do |instance_id|
-              if instances[instance_id][:type] != ri[:type] 
+              if instances[instance_id][:type] != ri[:type] && (!affinity || instances[instance_id][:account_id] == ri[:account_id]) 
                 factor_instance = get_factor(instances[instance_id][:type])
                 factor_ri = get_factor(ri[:type])
                 recommendation = {rid: ri_id}
@@ -214,31 +207,74 @@ class SummaryController < ApplicationController
                   # Split the RI
                   new_instances = factor_ri / factor_instance
                   recommendation[:count] = new_instances.to_i
+                  recommendation[:orig_count] = 1
                   #Rails.logger.debug("Change in the RI #{ri_id}, split in #{new_instances} to type #{instances[instance_id][:type]}")
 
                   summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1] -= 1
                   summary[instances[instance_id][:type]][instances[instance_id][:az]][ri[:platform]][ri[:tenancy]][1] += new_instances
                   reserved_instances[ri_id][:count] -= 1
                   reserved_instances[ri_id] = nil if reserved_instances[ri_id][:count] == 0
-                  recommendations << recommendation
+                  recommendations << [recommendation]
                   return true
                 else
-                  # Join the RI
+                  # Join the RI, I need more RIs to complete the needed factor of the instance
                   ri_needed = factor_instance / factor_ri
-                  if (summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1]-ri_needed) >= summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][0]
-                    # If after the RI modification I'm going to have enough RIs
-                    #Rails.logger.debug("Change in the RI #{ri_id}, join in #{ri_needed} to type #{instances[instance_id][:type]}")
+                  if (ri[:count] > ri_needed) && (summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1]-ri_needed) >= summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][0]
+                    # We only need join part of this RI to reach to the needed number of instances
                     recommendation[:count] = 1
+                    recommendation[:orig_count] = ri_needed
                     summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1] -= ri_needed
                     summary[instances[instance_id][:type]][instances[instance_id][:az]][ri[:platform]][ri[:tenancy]][1] += 1
                     reserved_instances[ri_id][:count] -= ri_needed
                     reserved_instances[ri_id] = nil if reserved_instances[ri_id][:count] == 0
-                    recommendations << recommendation
+                    recommendations << [recommendation]
                     return true
-                  end
-                  if (get_total_compatible_ri_factor(ri, reserved_instances, summary) > factor_instance)
-                    #TODO I can join multiple RIs to cover the instance
-                    #list_ris = get_combination_ris(get_list_possible_ris(ri, reserved_instances, summary), factor_instance)
+                  else
+                    # We need to find more RIs to join with this one
+                    list_ris = [ri]
+                    list_ri_ids = [ri_id]
+                    count_ri = [(summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1]-summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][0]), ri[:count]].min
+                    list_ri_counts = [count_ri]
+                    factor_ri_needed = factor_instance - (factor_ri*count_ri)
+
+                    reserved_instances.each do |ri_id2, ri2|
+                      if !ri2.nil? && ri2[:type].split(".")[0] == family && ri2[:az][0..-2] == region && ri2[:platform] == platform && ri2[:tenancy] == tenancy && ri2[:status] == 'active' && ri2[:account_id] == ri[:account_id] && !list_ri_ids.include?(ri_id2) && ri[:end].change(:min => 0) == ri2[:end].change(:min => 0) && ri[:offering] == ri2[:offering] && ri[:duration] == ri2[:duration]
+                        if summary[ri2[:type]][ri2[:az]][ri2[:platform]][ri2[:tenancy]][1] > summary[ri2[:type]][ri2[:az]][ri2[:platform]][ri2[:tenancy]][0]
+                          factor_ri2 = get_factor(ri2[:type])
+                          if factor_ri2 < factor_instance
+                            list_ris << ri2
+                            list_ri_ids << ri_id2
+                            count_ri = [(summary[ri2[:type]][ri2[:az]][ri2[:platform]][ri2[:tenancy]][1]-summary[ri2[:type]][ri2[:az]][ri2[:platform]][ri2[:tenancy]][0]), ri2[:count]].min
+                            if (factor_ri2*count_ri) > factor_ri_needed
+                              count_ri = factor_ri_needed/factor_ri2
+                              list_ri_counts << count_ri
+                              factor_ri_needed -= factor_ri2*count_ri
+                              break
+                            else
+                              list_ri_counts << count_ri
+                              factor_ri_needed -= factor_ri2*count_ri
+                            end
+                          end
+                        end
+                      end
+                    end
+                    if factor_ri_needed == 0
+                      recommendation_complex = []
+                      summary[instances[instance_id][:type]][instances[instance_id][:az]][instances[instance_id][:platform]][instances[instance_id][:tenancy]][1] += 1
+                      list_ris.each_index do |i|
+                        recommendation = {rid: list_ri_ids[i]}
+                        recommendation[:type] = instances[instance_id][:type]
+                        recommendation[:az] = instances[instance_id][:az] if instances[instance_id][:az] != list_ris[i][:az]
+                        recommendation[:count] = 1
+                        recommendation[:orig_count] = list_ri_counts[i]
+                        summary[list_ris[i][:type]][list_ris[i][:az]][list_ris[i][:platform]][list_ris[i][:tenancy]][1] -= list_ri_counts[i]
+                        reserved_instances[list_ri_ids[i]][:count] -= list_ri_counts[i]
+                        reserved_instances[list_ri_ids[i]] = nil if reserved_instances[list_ri_ids[i]][:count] == 0
+                        recommendation_complex << recommendation
+                      end
+                      recommendations << recommendation_complex
+                      return true
+                    end
                   end
                 end
               end
@@ -329,21 +365,21 @@ class SummaryController < ApplicationController
   def get_summary(instances, reserved_instances)
     summary = {}
 
-    instances.each do |instance_id, instance|
-      summary[instance[:type]] = {} if summary[instance[:type]].nil?
-      summary[instance[:type]][instance[:az]] = {} if summary[instance[:type]][instance[:az]].nil?
-      summary[instance[:type]][instance[:az]][instance[:platform]] = {} if summary[instance[:type]][instance[:az]][instance[:platform]].nil?
-      summary[instance[:type]][instance[:az]][instance[:platform]][instance[:tenancy]] = [0,0] if summary[instance[:type]][instance[:az]][instance[:platform]][instance[:tenancy]].nil?
-      summary[instance[:type]][instance[:az]][instance[:platform]][instance[:tenancy]][0] += 1
+    instances.each do |instance|
+      summary[instance.instancetype] = {} if summary[instance.instancetype].nil?
+      summary[instance.instancetype][instance.az] = {} if summary[instance.instancetype][instance.az].nil?
+      summary[instance.instancetype][instance.az][instance.platform] = {} if summary[instance.instancetype][instance.az][instance.platform].nil?
+      summary[instance.instancetype][instance.az][instance.platform][instance.tenancy] = [0,0] if summary[instance.instancetype][instance.az][instance.platform][instance.tenancy].nil?
+      summary[instance.instancetype][instance.az][instance.platform][instance.tenancy][0] += 1
     end
 
-    reserved_instances.each do |ri_id, ri|
-      if ri[:status] == 'active'
-        summary[ri[:type]] = {} if summary[ri[:type]].nil?
-        summary[ri[:type]][ri[:az]] = {} if summary[ri[:type]][ri[:az]].nil?
-        summary[ri[:type]][ri[:az]][ri[:platform]] = {} if summary[ri[:type]][ri[:az]][ri[:platform]].nil?
-        summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]] = [0,0] if summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]].nil?
-        summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1] += ri[:count]
+    reserved_instances.each do |ri|
+      if ri.status == 'active'
+        summary[ri.instancetype] = {} if summary[ri.instancetype].nil?
+        summary[ri.instancetype][ri.az] = {} if summary[ri.instancetype][ri.az].nil?
+        summary[ri.instancetype][ri.az][ri.platform] = {} if summary[ri.instancetype][ri.az][ri.platform].nil?
+        summary[ri.instancetype][ri.az][ri.platform][ri.tenancy] = [0,0] if summary[ri.instancetype][ri.az][ri.platform][ri.tenancy].nil?
+        summary[ri.instancetype][ri.az][ri.platform][ri.tenancy][1] += ri.count
       end
     end
 

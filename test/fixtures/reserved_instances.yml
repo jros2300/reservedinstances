@@ -1,0 +1,25 @@
+# Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  accountid: MyString
+  reservationid: MyString
+  instancetype: MyString
+  az: MyString
+  tenancy: MyString
+  platform: MyString
+  network: MyString
+  count: 1
+  enddate: 2016-05-31 15:47:02
+  status: MyString
+
+two:
+  accountid: MyString
+  reservationid: MyString
+  instancetype: MyString
+  az: MyString
+  tenancy: MyString
+  platform: MyString
+  network: MyString
+  count: 1
+  enddate: 2016-05-31 15:47:02
+  status: MyString

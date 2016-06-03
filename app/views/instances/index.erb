@@ -12,15 +12,15 @@
     </tr>
   </thead>
   <tbody>
-    <% @instances.each do |instance_id, instance| %>
+    <% @instances.each do |instance| %>
       <tr>
-        <td><%= instance[:account_id] %></td>
-        <td><%= instance_id %></td>
-        <td><%= instance[:type] %></td>
-        <td><%= instance[:az] %></td>
-        <td><%= instance[:tenancy] %></td>
-        <td><%= instance[:platform] %></td>
-        <td><%= instance[:vpc] %></td>
+        <td><%= instance.accountid %></td>
+        <td><%= instance.instanceid %></td>
+        <td><%= instance.instancetype %></td>
+        <td><%= instance.az %></td>
+        <td><%= instance.tenancy %></td>
+        <td><%= instance.platform %></td>
+        <td><%= instance.network %></td>
       </tr>
     <% end %>
   </tbody>

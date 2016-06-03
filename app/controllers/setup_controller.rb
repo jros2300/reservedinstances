@@ -1,6 +1,6 @@
 class SetupController < ApplicationController
 
-  #include AwsCommon
+  include AwsCommon
 
   def index
     @regions = Setup.get_regions
@@ -8,6 +8,7 @@ class SetupController < ApplicationController
     @importdbr = Setup.get_importdbr
     @s3bucket = Setup.get_s3bucket
     @processed = Setup.get_processed
+    @affinity = Setup.get_affinity
   end
 
   def change
@@ -19,13 +20,13 @@ class SetupController < ApplicationController
     end
     Setup.put_password params[:password] if !params[:password].blank?
     Setup.put_importdbr !params[:importdbr].blank?
+    Setup.put_affinity !params[:affinity].blank?
     Setup.put_s3bucket params[:s3bucket]
-    Rails.cache.clear
     redirect_to action: 'index'
   end
 
   def clear_cache
-    Rails.cache.clear
+    populatedb_data()
   end
 
 end
