@@ -2,6 +2,8 @@
 ## Introduction
 This tool is to manage your Reserved Instances in AWS across all your linked accounts. The tool reads your live configuration (instances and reserved instances) in all your accounts using the AWS API, and produces a set of recommendations to optimize your RI usage. The tool can apply the modifications in your RIs (changing the availability zone, instance type or network allocation) for you, and you can configure it to apply all the recommendations automatically every so often.
 
+> **Note:** If you were using the version 2.1 or previous you should modify your IAM roles in all the accounts to add the permission "ec2:DescribeAvailabilityZones" to all of them.
+
 > **Note:** Now the tool supports the instance types "Windows with SQL Standard", "Windows with SQL Web", "Windows with SQL Enterprise", "RHEL" and "SLES". If you're using any of these instance types you should configure the DBR file.
 
 ## Installation
@@ -28,7 +30,8 @@ For each account where you're not going to deploy the tool (so for all but accou
                 "ec2:DescribeReservedInstancesModifications",
                 "ec2:DescribeReservedInstancesOfferings",
                 "ec2:DescribeAccountAttributes",
-                "ec2:ModifyReservedInstances"
+                "ec2:ModifyReservedInstances",
+                "ec2:DescribeAvailabilityZones"
             ],
             "Resource": [
                 "*"

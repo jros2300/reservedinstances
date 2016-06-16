@@ -80,6 +80,37 @@ module AwsCommon
     instances
   end
 
+  def get_zones(regions, account_ids)
+    return get_mock_zones if !ENV['MOCK_DATA'].blank?
+    zones = {}
+    current_account_id = get_current_account_id
+    account_ids.each do |account_id|
+      zones[account_id[0]] = []
+      regions.select {|key, value| value }.keys.each do |region|
+        if account_id[0] == current_account_id
+          ec2 = Aws::EC2::Client.new(region: region)
+        else
+          role_credentials = Aws::AssumeRoleCredentials.new( client: Aws::STS::Client.new(region: region), role_arn: account_id[1], role_session_name: "reserved_instances" )
+          ec2 = Aws::EC2::Client.new(region: region, credentials: role_credentials)
+        end
+        resp = ec2.describe_availability_zones()
+        resp.availability_zones.each do |az|
+          zones[account_id[0]] << az.zone_name if az.state == 'available'
+        end
+      end
+    end
+    zones
+  end
+
+  def get_mock_zones()
+    zones = {}
+    CSV.foreach('/tmp/zones.csv', headers: true) do |row|
+      zones[row[1]] = [] if !zones[row[1]]
+      zones[row[1]] << row[2]
+    end
+    return zones
+  end
+
   def get_failed_modifications(regions, account_ids)
     return [] if !ENV['MOCK_DATA'].blank?
     failed_modifications = []
@@ -451,6 +482,7 @@ module AwsCommon
     reserved_instances = get_reserved_instances(Setup.get_regions, get_account_ids)
     failed_modifications = get_failed_modifications(Setup.get_regions, get_account_ids)
     summary = get_summary(instances, reserved_instances)
+    zones = get_zones(Setup.get_regions, get_account_ids)
 
     continue_iteration = true
     recommendations = []
@@ -461,7 +493,7 @@ module AwsCommon
       excess = {}
       # Excess of Instances and Reserved Instances per set of interchangable types
       calculate_excess(summary2, excess)
-      continue_iteration = iterate_recommendation(excess, instances2, summary2, reserved_instances2, recommendations)
+      continue_iteration = iterate_recommendation(excess, instances2, summary2, reserved_instances2, recommendations, zones)
     end
 
     ActiveRecord::Base.transaction do
@@ -584,7 +616,7 @@ module AwsCommon
     end
   end
 
-  def iterate_recommendation(excess, instances, summary, reserved_instances, recommendations)
+  def iterate_recommendation(excess, instances, summary, reserved_instances, recommendations, zones)
     excess.each do |family, elem1|
       elem1.each do |region, elem2|
         elem2.each do |platform, elem3|
@@ -592,9 +624,9 @@ module AwsCommon
             if total[1] > 0 && total[0] > 0
               # There are reserved instances not used and instances on-demand
               if Setup.get_affinity
-                return true if calculate_recommendation(instances, family, region, platform, tenancy, summary, reserved_instances, recommendations, true)
+                return true if calculate_recommendation(instances, family, region, platform, tenancy, summary, reserved_instances, recommendations, true, zones)
               end
-              return true if calculate_recommendation(instances, family, region, platform, tenancy, summary, reserved_instances, recommendations, false)
+              return true if calculate_recommendation(instances, family, region, platform, tenancy, summary, reserved_instances, recommendations, false, zones)
             end
           end
         end
@@ -603,7 +635,7 @@ module AwsCommon
     return false
   end
 
-  def calculate_recommendation(instances, family, region, platform, tenancy, summary, reserved_instances, recommendations, affinity)
+  def calculate_recommendation(instances, family, region, platform, tenancy, summary, reserved_instances, recommendations, affinity, zones)
     excess_instance = []
 
     instances.each do |instance_id, instance|
@@ -625,12 +657,10 @@ module AwsCommon
           # I'm going to look for an instance which can use this reservation
           excess_instance.each do |instance_id|
             # Change with the same type
-            if instances[instance_id][:type] == ri[:type] && (!affinity || instances[instance_id][:account_id] == ri[:account_id])
+            if instances[instance_id][:type] == ri[:type] && (!affinity || instances[instance_id][:account_id] == ri[:account_id]) && (instances[instance_id][:az] != ri[:az]) && zones[ri[:account_id]].include?(instances[instance_id][:az])
               recommendation = {rid: ri_id, count: 1, orig_count: 1}
-              if instances[instance_id][:az] != ri[:az]
-                recommendation[:az] = instances[instance_id][:az]
-                #Rails.logger.debug("Change in the RI #{ri_id}, to az #{instances[instance_id][:az]}")
-              end
+              recommendation[:az] = instances[instance_id][:az]
+              #Rails.logger.debug("Change in the RI #{ri_id}, to az #{instances[instance_id][:az]}")
               summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1] -= 1
               summary[ri[:type]][instances[instance_id][:az]][ri[:platform]][ri[:tenancy]][1] += 1
               reserved_instances[ri_id][:count] -= 1
@@ -653,7 +683,7 @@ module AwsCommon
             # If for this reservation type we have excess of RIs
             # I'm going to look for an instance which can use this reservation
             excess_instance.each do |instance_id|
-              if instances[instance_id][:type] != ri[:type] && (!affinity || instances[instance_id][:account_id] == ri[:account_id])
+              if instances[instance_id][:type] != ri[:type] && (!affinity || instances[instance_id][:account_id] == ri[:account_id]) && zones[ri[:account_id]].include?(instances[instance_id][:az])
                 factor_instance = get_factor(instances[instance_id][:type])
                 factor_ri = get_factor(ri[:type])
                 recommendation = {rid: ri_id}
