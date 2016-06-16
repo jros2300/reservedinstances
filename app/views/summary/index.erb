@@ -12,21 +12,15 @@
       </tr>
     </thead>
     <tbody>
-      <% @summary.each do |type, elem1| %>
-        <% elem1.each do |az, elem2| %>
-          <% elem2.each do |platform, elem3| %>
-            <% elem3.each do |tenancy, total| %>
-              <tr>
-                <td><%= type %></td>
-                <td><%= az %></td>
-                <td><%= platform %></td>
-                <td><%= tenancy %></td>
-                <td><%= total[0] %></td>
-                <td><%= total[1] %></td>
-              </tr>
-            <% end %>
-          <% end %>
-        <% end %>
+      <% @summary.each do |s| %>
+        <tr>
+          <td><%= s.instancetype %></td>
+          <td><%= s.az %></td>
+          <td><%= s.platform %></td>
+          <td><%= s.tenancy %></td>
+          <td><%= s.total %></td>
+          <td><%= s.reservations %></td>
+        </tr>
       <% end %>
     </tbody>
   </table>

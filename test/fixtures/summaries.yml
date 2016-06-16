@@ -1,0 +1,17 @@
+# Read about fixtures at http://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  instancetype: MyString
+  az: MyString
+  tenancy: MyString
+  platform: MyString
+  total: 
+  reservations: 1
+
+two:
+  instancetype: MyString
+  az: MyString
+  tenancy: MyString
+  platform: MyString
+  total: 
+  reservations: 1

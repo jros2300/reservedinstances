@@ -15,6 +15,10 @@
       <div class="col-xs-2"><%= number_field_tag "minutes", @minutes.to_s, min:0, id: 'minutestext', class: 'form-control' %></div><span id="helpBlock" class="help-block">minutes (0 to stop, minimum 30)</span>
     </div>
     <div class="form-group">
+      <label>Automatically refresh information from the accounts each</label></br>
+      <div class="col-xs-2"><%= number_field_tag "minutesrefresh", @minutesrefresh.to_s, min:5, id: 'minutesrefreshtext', class: 'form-control' %></div><span id="helpBlock" class="help-block">minutesrefresh (minimum 5)</span>
+    </div>
+    <div class="form-group">
         <label class="checkbox-inline">
           <%= check_box_tag "affinity", "affinity", @affinity %>
           Use affinity (move Reserved instances to cover other instances in the same account first)

@@ -5,6 +5,7 @@ class SetupController < ApplicationController
   def index
     @regions = Setup.get_regions
     @minutes = Setup.get_minutes
+    @minutesrefresh = Setup.get_minutesrefresh
     @importdbr = Setup.get_importdbr
     @s3bucket = Setup.get_s3bucket
     @processed = Setup.get_processed
@@ -17,6 +18,9 @@ class SetupController < ApplicationController
     end
     if !params[:minutes].blank?
       Setup.put_minutes params[:minutes] if params[:minutes].to_i >= 30 || params[:minutes].to_i == 0 
+    end
+    if !params[:minutesrefresh].blank?
+      Setup.put_minutesrefresh params[:minutesrefresh] if params[:minutesrefresh].to_i >= 5
     end
     Setup.put_password params[:password] if !params[:password].blank?
     Setup.put_importdbr !params[:importdbr].blank?

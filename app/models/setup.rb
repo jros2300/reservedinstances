@@ -19,6 +19,24 @@ class Setup < ActiveRecord::Base
     update_next
   end
 
+  def self.get_minutesrefresh
+    minutesrefresh = 5
+    setup = Setup.first
+    if !setup.nil?
+      minutesrefresh = setup.minutesrefresh if !setup.minutesrefresh.nil?
+    end
+    return minutesrefresh
+  end
+
+  def self.put_minutesrefresh(minutes)
+    setup = Setup.first
+    setup = Setup.new if setup.nil?
+
+    setup.minutesrefresh = minutes
+    setup.save
+    update_nextrefresh
+  end
+
   def self.get_password
     password = BCrypt::Password.create(ENV['DEFAULT_PASSWORD'])
     setup = Setup.first
@@ -130,6 +148,30 @@ class Setup < ActiveRecord::Base
     end
     return after_next
   end
+
+  def self.update_nextrefresh
+    minutesrefresh = 5
+    setup = Setup.first
+    if !setup.nil?
+      minutesrefresh = setup.minutesrefresh if !setup.minutesrefresh.nil?
+    end
+
+    setup.nextrefresh = Time.current + minutesrefresh.minutes
+    setup.save
+  end
+
+  def self.now_after_nextrefresh
+    ###### DELETE THIS #######
+    return true
+    ###### DELETE THIS #######
+    after_nextrefresh = true
+    setup = Setup.first
+    if !setup.nil? && !setup.nextrefresh.nil?
+      after_nextrefresh = (setup.nextrefresh < Time.current)
+    end
+    return after_nextrefresh
+  end
+
 
   def self.get_regions
     regions = {"eu-west-1"=> false, "us-east-1"=> false, "eu-central-1"=> false, "us-west-1"=> false, "us-west-2"=> false, "ap-southeast-1"=> false, "ap-southeast-2"=> false, "ap-northeast-1"=> false, "sa-east-1"=> false}

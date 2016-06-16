@@ -11,7 +11,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20160601145048) do
+ActiveRecord::Schema.define(version: 20160616142650) do
 
   create_table "amis", force: :cascade do |t|
     t.string "ami"
@@ -35,6 +35,12 @@ ActiveRecord::Schema.define(version: 20160601145048) do
     t.string   "status"
     t.datetime "created_at",     null: false
     t.datetime "updated_at",     null: false
+  end
+
+  create_table "recommendation_caches", force: :cascade do |t|
+    t.text     "object"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "recommendations", force: :cascade do |t|
@@ -70,8 +76,8 @@ ActiveRecord::Schema.define(version: 20160601145048) do
 
   create_table "setups", force: :cascade do |t|
     t.text     "regions"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "created_at",     null: false
+    t.datetime "updated_at",     null: false
     t.integer  "minutes"
     t.datetime "nextrun"
     t.string   "password"
@@ -79,6 +85,19 @@ ActiveRecord::Schema.define(version: 20160601145048) do
     t.string   "s3bucket"
     t.datetime "processed"
     t.boolean  "affinity"
+    t.datetime "nextrefresh"
+    t.integer  "minutesrefresh"
+  end
+
+  create_table "summaries", force: :cascade do |t|
+    t.string   "instancetype"
+    t.string   "az"
+    t.string   "tenancy"
+    t.string   "platform"
+    t.integer  "total"
+    t.integer  "reservations"
+    t.datetime "created_at",   null: false
+    t.datetime "updated_at",   null: false
   end
 
 end

@@ -450,47 +450,299 @@ module AwsCommon
     instances = get_instances(Setup.get_regions, get_account_ids)
     reserved_instances = get_reserved_instances(Setup.get_regions, get_account_ids)
     failed_modifications = get_failed_modifications(Setup.get_regions, get_account_ids)
+    summary = get_summary(instances, reserved_instances)
 
-    Instance.delete_all
-    ReservedInstance.delete_all
-    Modification.delete_all
+    continue_iteration = true
+    recommendations = []
+    instances2 = Marshal.load(Marshal.dump(instances))
+    reserved_instances2 = Marshal.load(Marshal.dump(reserved_instances))
+    summary2 = Marshal.load(Marshal.dump(summary))
+    while continue_iteration do
+      excess = {}
+      # Excess of Instances and Reserved Instances per set of interchangable types
+      calculate_excess(summary2, excess)
+      continue_iteration = iterate_recommendation(excess, instances2, summary2, reserved_instances2, recommendations)
+    end
+
+    ActiveRecord::Base.transaction do
+      Instance.delete_all
+      ReservedInstance.delete_all
+      Modification.delete_all
+      Summary.delete_all
+      RecommendationCache.delete_all
+      instances.each do |instance_id, instance|
+        new_instance = Instance.new
+        new_instance.accountid = instance[:account_id]
+        new_instance.instanceid = instance_id
+        new_instance.instancetype = instance[:type]
+        new_instance.az = instance[:az]
+        new_instance.tenancy = instance[:tenancy]
+        new_instance.platform = instance[:platform]
+        new_instance.network = instance[:vpc]
+        new_instance.save
+      end
+
+      reserved_instances.each do |ri_id, ri|
+        new_ri = ReservedInstance.new
+        new_ri.accountid = ri[:account_id]
+        new_ri.reservationid = ri_id
+        new_ri.instancetype = ri[:type]
+        new_ri.az = ri[:az]
+        new_ri.tenancy = ri[:tenancy]
+        new_ri.platform = ri[:platform]
+        new_ri.network = ri[:vpc]
+        new_ri.count = ri[:count]
+        new_ri.enddate = ri[:end]
+        new_ri.status = ri[:status]
+        new_ri.rolearn = ri[:role_arn]
+        new_ri.offering = ri[:offering]
+        new_ri.duration = ri[:duration]
+
+        new_ri.save
+      end
+
+      failed_modifications.each do |modification|
+        new_modification = Modification.new
+        new_modification.modificationid = modification
+        new_modification.status = 'failed'
+        new_modification.save
+      end
+
+      summary.each do |type, elem1|
+        elem1.each do |az, elem2| 
+          elem2.each do |platform, elem3| 
+            elem3.each do |tenancy, total|
+              new_summary = Summary.new
+              new_summary.instancetype = type
+              new_summary.az = az
+              new_summary.tenancy = tenancy
+              new_summary.platform = platform
+              new_summary.total = total[0]
+              new_summary.reservations = total[1]
+              new_summary.save
+            end
+          end
+        end
+      end
+      recommendations.each do |recommendation|
+        new_recommendation = RecommendationCache.new
+        new_recommendation.object = Marshal.dump(recommendation)
+        new_recommendation.save
+      end
+    end
+  end
+
+  def get_summary(instances, reserved_instances)
+    summary = {}
+
     instances.each do |instance_id, instance|
-      new_instance = Instance.new
-      new_instance.accountid = instance[:account_id]
-      new_instance.instanceid = instance_id
-      new_instance.instancetype = instance[:type]
-      new_instance.az = instance[:az]
-      new_instance.tenancy = instance[:tenancy]
-      new_instance.platform = instance[:platform]
-      new_instance.network = instance[:vpc]
-      new_instance.save
+      summary[instance[:type]] = {} if summary[instance[:type]].nil?
+      summary[instance[:type]][instance[:az]] = {} if summary[instance[:type]][instance[:az]].nil?
+      summary[instance[:type]][instance[:az]][instance[:platform]] = {} if summary[instance[:type]][instance[:az]][instance[:platform]].nil?
+      summary[instance[:type]][instance[:az]][instance[:platform]][instance[:tenancy]] = [0,0] if summary[instance[:type]][instance[:az]][instance[:platform]][instance[:tenancy]].nil?
+      summary[instance[:type]][instance[:az]][instance[:platform]][instance[:tenancy]][0] += 1
     end
 
     reserved_instances.each do |ri_id, ri|
-      new_ri = ReservedInstance.new
-      new_ri.accountid = ri[:account_id]
-      new_ri.reservationid = ri_id
-      new_ri.instancetype = ri[:type]
-      new_ri.az = ri[:az]
-      new_ri.tenancy = ri[:tenancy]
-      new_ri.platform = ri[:platform]
-      new_ri.network = ri[:vpc]
-      new_ri.count = ri[:count]
-      new_ri.enddate = ri[:end]
-      new_ri.status = ri[:status]
-      new_ri.rolearn = ri[:role_arn]
-      new_ri.offering = ri[:offering]
-      new_ri.duration = ri[:duration]
-
-      new_ri.save
+      if ri[:status] == 'active'
+        summary[ri[:type]] = {} if summary[ri[:type]].nil?
+        summary[ri[:type]][ri[:az]] = {} if summary[ri[:type]][ri[:az]].nil?
+        summary[ri[:type]][ri[:az]][ri[:platform]] = {} if summary[ri[:type]][ri[:az]][ri[:platform]].nil?
+        summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]] = [0,0] if summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]].nil?
+        summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1] += ri[:count]
+      end
     end
 
-    failed_modifications.each do |modification|
-      new_modification = Modification.new
-      new_modification.modificationid = modification
-      new_modification.status = 'failed'
-      new_modification.save
+    return summary
+  end
+  def calculate_excess(summary, excess)
+    # Group the excess of RIs and instances per family and region
+    # For example, for m3 in eu-west-1, it calculate the total RIs not used and the total instances not assigned to an RI (in any family type and AZ)
+    summary.each do |type, elem1|
+      elem1.each do |az, elem2|
+        elem2.each do |platform, elem3|
+          elem3.each do |tenancy, total|
+            if total[0] != total[1]
+              family = type.split(".")[0]
+              region = az[0..-2]
+              excess[family] = {} if excess[family].nil?
+              excess[family][region] = {} if excess[family][region].nil?
+              excess[family][region][platform] = {} if excess[family][region][platform].nil?
+              excess[family][region][platform][tenancy] = [0,0] if excess[family][region][platform][tenancy].nil?
+              factor = get_factor(type)
+              if total[0] > total[1]
+                # [0] -> Total of instances without a reserved instance
+                excess[family][region][platform][tenancy][0] += (total[0]-total[1])*factor
+              else
+                # [1] -> Total of reserved instances not used
+                excess[family][region][platform][tenancy][1] += (total[1]-total[0])*factor
+              end
+            end
+          end
+        end
+      end
     end
+  end
+
+  def iterate_recommendation(excess, instances, summary, reserved_instances, recommendations)
+    excess.each do |family, elem1|
+      elem1.each do |region, elem2|
+        elem2.each do |platform, elem3|
+          elem3.each do |tenancy, total|
+            if total[1] > 0 && total[0] > 0
+              # There are reserved instances not used and instances on-demand
+              if Setup.get_affinity
+                return true if calculate_recommendation(instances, family, region, platform, tenancy, summary, reserved_instances, recommendations, true)
+              end
+              return true if calculate_recommendation(instances, family, region, platform, tenancy, summary, reserved_instances, recommendations, false)
+            end
+          end
+        end
+      end
+    end
+    return false
+  end
+
+  def calculate_recommendation(instances, family, region, platform, tenancy, summary, reserved_instances, recommendations, affinity)
+    excess_instance = []
+
+    instances.each do |instance_id, instance|
+      if instance[:type].split(".")[0] == family && instance[:az][0..-2] == region && instance[:platform] == platform && instance[:tenancy] == tenancy
+        # This instance is of the usable type
+        if summary[instance[:type]][instance[:az]][instance[:platform]][instance[:tenancy]][0] > summary[instance[:type]][instance[:az]][instance[:platform]][instance[:tenancy]][1]
+          # If for this instance type we have excess of instances
+          excess_instance << instance_id
+        end
+      end
+    end
+
+    # First look for AZ changes
+    reserved_instances.each do |ri_id, ri|
+      if !ri.nil? && ri[:type].split(".")[0] == family && ri[:az][0..-2] == region && ri[:platform] == platform && ri[:tenancy] == tenancy && ri[:status] == 'active'
+        # This reserved instance is of the usable type
+        if summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1] > summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][0]
+          # If for this reservation type we have excess of RIs
+          # I'm going to look for an instance which can use this reservation
+          excess_instance.each do |instance_id|
+            # Change with the same type
+            if instances[instance_id][:type] == ri[:type] && (!affinity || instances[instance_id][:account_id] == ri[:account_id])
+              recommendation = {rid: ri_id, count: 1, orig_count: 1}
+              if instances[instance_id][:az] != ri[:az]
+                recommendation[:az] = instances[instance_id][:az]
+                #Rails.logger.debug("Change in the RI #{ri_id}, to az #{instances[instance_id][:az]}")
+              end
+              summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1] -= 1
+              summary[ri[:type]][instances[instance_id][:az]][ri[:platform]][ri[:tenancy]][1] += 1
+              reserved_instances[ri_id][:count] -= 1
+              reserved_instances[ri_id] = nil if reserved_instances[ri_id][:count] == 0
+              recommendations << [recommendation]
+              return true
+            end
+          end
+        end
+      end
+    end
+
+    # Now I look for type changes
+    # Only for Linux instances
+    if platform == 'Linux/UNIX'
+      reserved_instances.each do |ri_id, ri|
+        if !ri.nil? && ri[:type].split(".")[0] == family && ri[:az][0..-2] == region && ri[:platform] == platform && ri[:tenancy] == tenancy && ri[:status] == 'active'
+          # This reserved instance is of the usable type
+          if summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1] > summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][0]
+            # If for this reservation type we have excess of RIs
+            # I'm going to look for an instance which can use this reservation
+            excess_instance.each do |instance_id|
+              if instances[instance_id][:type] != ri[:type] && (!affinity || instances[instance_id][:account_id] == ri[:account_id])
+                factor_instance = get_factor(instances[instance_id][:type])
+                factor_ri = get_factor(ri[:type])
+                recommendation = {rid: ri_id}
+                recommendation[:type] = instances[instance_id][:type]
+                recommendation[:az] = instances[instance_id][:az] if instances[instance_id][:az] != ri[:az]
+                #recommendation[:vpc] = instances[instance_id][:vpc] if instances[instance_id][:vpc] != ri[:vpc]
+                if factor_ri > factor_instance
+                  # Split the RI
+                  new_instances = factor_ri / factor_instance
+                  recommendation[:count] = new_instances.to_i
+                  recommendation[:orig_count] = 1
+                  #Rails.logger.debug("Change in the RI #{ri_id}, split in #{new_instances} to type #{instances[instance_id][:type]}")
+
+                  summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1] -= 1
+                  summary[instances[instance_id][:type]][instances[instance_id][:az]][ri[:platform]][ri[:tenancy]][1] += new_instances
+                  reserved_instances[ri_id][:count] -= 1
+                  reserved_instances[ri_id] = nil if reserved_instances[ri_id][:count] == 0
+                  recommendations << [recommendation]
+                  return true
+                else
+                  # Join the RI, I need more RIs to complete the needed factor of the instance
+                  ri_needed = factor_instance / factor_ri
+                  if (ri[:count] > ri_needed) && (summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1]-ri_needed) >= summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][0]
+                    # We only need join part of this RI to reach to the needed number of instances
+                    recommendation[:count] = 1
+                    recommendation[:orig_count] = ri_needed
+                    summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1] -= ri_needed
+                    summary[instances[instance_id][:type]][instances[instance_id][:az]][ri[:platform]][ri[:tenancy]][1] += 1
+                    reserved_instances[ri_id][:count] -= ri_needed
+                    reserved_instances[ri_id] = nil if reserved_instances[ri_id][:count] == 0
+                    recommendations << [recommendation]
+                    return true
+                  else
+                    # We need to find more RIs to join with this one
+                    list_ris = [ri]
+                    list_ri_ids = [ri_id]
+                    count_ri = [(summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][1]-summary[ri[:type]][ri[:az]][ri[:platform]][ri[:tenancy]][0]), ri[:count]].min
+                    list_ri_counts = [count_ri]
+                    factor_ri_needed = factor_instance - (factor_ri*count_ri)
+
+                    reserved_instances.each do |ri_id2, ri2|
+                      if !ri2.nil? && ri2[:type].split(".")[0] == family && ri2[:az][0..-2] == region && ri2[:platform] == platform && ri2[:tenancy] == tenancy && ri2[:status] == 'active' && ri2[:account_id] == ri[:account_id] && !list_ri_ids.include?(ri_id2) && ri[:end].change(:min => 0) == ri2[:end].change(:min => 0) && ri[:offering] == ri2[:offering] && ri[:duration] == ri2[:duration]
+                        if summary[ri2[:type]][ri2[:az]][ri2[:platform]][ri2[:tenancy]][1] > summary[ri2[:type]][ri2[:az]][ri2[:platform]][ri2[:tenancy]][0]
+                          factor_ri2 = get_factor(ri2[:type])
+                          if factor_ri2 < factor_instance
+                            list_ris << ri2
+                            list_ri_ids << ri_id2
+                            count_ri = [(summary[ri2[:type]][ri2[:az]][ri2[:platform]][ri2[:tenancy]][1]-summary[ri2[:type]][ri2[:az]][ri2[:platform]][ri2[:tenancy]][0]), ri2[:count]].min
+                            if (factor_ri2*count_ri) > factor_ri_needed
+                              count_ri = factor_ri_needed/factor_ri2
+                              list_ri_counts << count_ri
+                              factor_ri_needed -= factor_ri2*count_ri
+                              break
+                            else
+                              list_ri_counts << count_ri
+                              factor_ri_needed -= factor_ri2*count_ri
+                            end
+                          end
+                        end
+                      end
+                    end
+                    if factor_ri_needed == 0
+                      recommendation_complex = []
+                      summary[instances[instance_id][:type]][instances[instance_id][:az]][instances[instance_id][:platform]][instances[instance_id][:tenancy]][1] += 1
+                      list_ris.each_index do |i|
+                        recommendation = {rid: list_ri_ids[i]}
+                        recommendation[:type] = instances[instance_id][:type]
+                        recommendation[:az] = instances[instance_id][:az] if instances[instance_id][:az] != list_ris[i][:az]
+                        recommendation[:count] = 1
+                        recommendation[:orig_count] = list_ri_counts[i]
+                        summary[list_ris[i][:type]][list_ris[i][:az]][list_ris[i][:platform]][list_ris[i][:tenancy]][1] -= list_ri_counts[i]
+                        reserved_instances[list_ri_ids[i]][:count] -= list_ri_counts[i]
+                        reserved_instances[list_ri_ids[i]] = nil if reserved_instances[list_ri_ids[i]][:count] == 0
+                        recommendation_complex << recommendation
+                      end
+                      recommendations << recommendation_complex
+                      return true
+                    end
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+
+    return false
+
   end
 
 end
